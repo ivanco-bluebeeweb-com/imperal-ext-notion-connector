@@ -1,75 +1,81 @@
-"""Workspaces panel: connection state, what is accessible, and why not.
+"""Panels: connect first, then show what is reachable and why.
 
-Section 3 of the spec is the reason this panel exists: the connector must SHOW
-what is accessible, what is not, and why. An empty Notion connector is almost
-never broken -- it is un-shared -- and that sentence belongs on screen, not in
-a support conversation.
+Three surfaces, in the order a new user meets them:
 
-SKETCH -- workspaces panel (every component checked against PRE-PANEL CHECKLIST)
-  ui.Stack (v, gap=4)
-    ui.Header(text="Notion Connector", level=2, subtitle=...)
-    ui.Alert(message=..., type=...)                 -- connection state
-    ui.Section(title="Connected workspaces", children=[   -- children REQUIRED
-      ui.DataTable(columns=[DataColumn dicts], rows=[plain dicts])
-      | ui.Empty(message=...)                       -- never return None
-    ])
-    ui.Section(title="How access works", children=[
-      ui.Text(content=..., variant="body") x2   -- content=, NOT text=
-      ui.Button(label="Re-check access", variant="secondary",
-                on_click=ui.Call("__panel__workspaces", refresh=True))
-      ui.Link(label="Open notion.so/my-integrations", href=...)
-    ])
+* ``connect``    -- center overlay: paste a token and be done. This exists
+                    because a first-time user opened the app and had nowhere to
+                    put their token; the auto-injected Secrets tab is correct
+                    but not discoverable.
+* ``workspaces`` -- center overlay: connected workspaces, and the sharing rules
+                    that explain an empty result (spec section 3).
+* ``notion_nav`` -- left sidebar: connection state at a glance.
 
-Checklist notes that shaped the above:
-  * ui.DataColumn returns a DICT -> passed as a list of dicts to DataTable.
-  * ui.Section requires children= -> always passed, never omitted.
-  * ui.Badge would need label= (not text=) -- not used here; the table renders
-    plain strings instead, which keeps the rows simple dicts.
-  * ui.Empty() returned instead of None when there is nothing to show.
-  * @ext.panel slot="center" REQUIRES center_overlay=True or it is never
-    fetched; refresh_seconds does not exist, so refresh="manual" + a button.
-  * ui.Input is NOT used: tokens must never travel through a panel form field.
-    They belong in the platform Secrets tab, which is Vault-encrypted.
+CREDENTIAL HANDLING (federal EXT-SECRETS-V1)
+``notion_tokens`` is declared ``write_mode="user"``, so extension code CANNOT
+write it -- ``ctx.secrets.set()`` raises SecretWriteForbidden. The sanctioned
+path is a ``ui.Form`` posting to the platform action ``save_app_secret`` with a
+``ui.Password`` child, so the plaintext goes straight from the browser to the
+auth gateway and is Vault-encrypted. No panel here ever reads a token back.
 """
 
 from __future__ import annotations
 
 from imperal_sdk import ui
 
-import notion_client as nc
 import workspaces as ws
 from app import ext
 
 _INTEGRATIONS_URL = "https://www.notion.so/my-integrations"
 
+# The app_id the platform action needs, and the declared secret name.
+_APP_ID = "notion-connector"
+_SECRET_NAME = "notion_tokens"
 
-def _state_alert(count: int, errors: list[str]):
+
+def _errors_of(records: list[dict]) -> list[str]:
+    """Human sentences for tokens that came back unusable.
+
+    `list_workspaces` returns ONE list of records, each carrying its own
+    status -- a broken token is a row, not an exception, so the messages are
+    derived here rather than returned alongside.
+    """
+    out: list[str] = []
+    for record in records:
+        if record.get("status") != "ok":
+            label = record.get("workspace_name") or "A token"
+            detail = record.get("error") or "This token is not usable."
+            out.append(f"{label}: {detail}")
+    return out
+
+
+def _state_alert(records: list[dict]):
     """One banner describing the connection state in the user's terms."""
-    if errors and not count:
+    errors = _errors_of(records)
+    usable = sum(1 for r in records if r.get("status") == "ok")
+
+    if not records:
+        return ui.Alert(
+            title="No Notion workspace connected yet",
+            message=(
+                "Use Connect Notion below: create an integration, paste its "
+                "token, and share the pages it should reach."
+            ),
+            type="info",
+        )
+    if not usable:
         return ui.Alert(
             title="Not connected",
             message=" ".join(errors),
             type="error",
         )
-    if not count:
-        return ui.Alert(
-            title="No Notion workspace connected yet",
-            message=(
-                "Create an integration at notion.so/my-integrations, copy its "
-                "internal integration token, and paste it into the Secrets tab "
-                "as notion_tokens. One token per line connects several "
-                "workspaces."
-            ),
-            type="info",
-        )
     if errors:
         return ui.Alert(
-            title=f"{count} workspace(s) connected, some tokens need attention",
+            title=f"{usable} of {len(records)} workspace(s) ready",
             message=" ".join(errors),
             type="warn",
         )
     return ui.Alert(
-        title=f"{count} workspace(s) connected",
+        title=f"{usable} workspace(s) connected",
         message=(
             "Ready. Ask in chat to search, read pages, or query databases -- "
             "by name, no ids needed."
@@ -78,46 +84,207 @@ def _state_alert(count: int, errors: list[str]):
     )
 
 
+@ext.panel("connect", slot="center", title="Connect Notion", icon="Plug",
+           center_overlay=True, refresh="manual")
+async def connect_panel(ctx, **kwargs):
+    """Paste an integration token and connect a workspace.
+
+    SKETCH -- connect screen (props checked against ui-components-reference)
+      ui.Stack (v, gap=4)
+        ui.Header(text="Connect Notion", level=2, subtitle=...)
+        ui.Alert(...)                       -- already-connected notice, if any
+        ui.Section(title="1. Create an integration", children=[
+          ui.Text(content=..., variant="body")
+          ui.Link(label="Open notion.so/my-integrations", href=...)
+        ])
+        ui.Section(title="2. Paste the token", children=[
+          ui.Form(action="save_app_secret", submit_label="Connect",
+                  defaults={"app_id": ..., "name": ...},
+                  children=[ui.Password(placeholder="ntn_...",
+                                        param_name="value")])
+        ])
+        ui.Section(title="3. Share your pages", children=[
+          ui.Text(content=..., variant="body")
+          ui.Button(label="Check what is reachable", ...)
+        ])
+
+    Checklist notes:
+      * ui.Password -- NOT ui.Input -- is the required credential surface, and
+        the value never round-trips back into the panel.
+      * ui.Form(action="save_app_secret") posts to the platform action; the
+        extension cannot write a write_mode="user" secret itself.
+      * slot="center" REQUIRES center_overlay=True, else it is never fetched.
+      * ui.Section always gets children=; ui.Text takes content=, not text=.
+    """
+    try:
+        records = await ws.list_workspaces(ctx)
+    except Exception:
+        await ctx.log("connect panel could not read workspace state", "error")
+        records = []
+
+    children = [
+        ui.Header(
+            text="Connect Notion",
+            level=2,
+            subtitle="Three steps, about a minute",
+        )
+    ]
+
+    # Saving REPLACES the whole secret, so an existing setup gets a warning
+    # rather than a silent overwrite of other workspaces' tokens.
+    if records:
+        children.append(ui.Alert(
+            title=f"{len(records)} token(s) already saved",
+            message=(
+                "Saving here replaces the whole token list. To add another "
+                "workspace without losing this one, edit notion_tokens in the "
+                "Secrets tab and put each token on its own line."
+            ),
+            type="warn",
+        ))
+
+    children.append(ui.Section(
+        title="1. Create an integration in Notion",
+        children=[
+            ui.Text(
+                content=(
+                    "Open notion.so/my-integrations and create a new "
+                    "INTERNAL integration for the workspace you want to use, "
+                    "then copy its internal integration secret (it starts "
+                    "with ntn_). Internal is the right type here -- public "
+                    "integrations ask for a redirect URI, which this "
+                    "connector does not use."
+                ),
+                variant="body",
+            ),
+            ui.Link(
+                label="Open notion.so/my-integrations",
+                href=_INTEGRATIONS_URL,
+            ),
+        ],
+    ))
+
+    children.append(ui.Section(
+        title="2. Paste the token",
+        children=[
+            ui.Text(
+                content=(
+                    "The token is stored encrypted and is never shown back "
+                    "here, not even to you."
+                ),
+                variant="body",
+            ),
+            ui.Form(
+                action="save_app_secret",
+                submit_label="Connect",
+                defaults={"app_id": _APP_ID, "name": _SECRET_NAME},
+                children=[
+                    ui.Password(
+                        placeholder="ntn_...",
+                        param_name="value",
+                    ),
+                ],
+            ),
+        ],
+    ))
+
+    children.append(ui.Section(
+        title="3. Share the pages it should see",
+        children=[
+            ui.Text(
+                content=(
+                    "A fresh integration sees nothing by default. In Notion, "
+                    "open each page or database, click the three-dot menu, "
+                    "choose Connections, and add your integration. Subpages "
+                    "are included automatically."
+                ),
+                variant="body",
+            ),
+            ui.Row(
+                gap=3,
+                children=[
+                    ui.Button(
+                        label="Check what is reachable",
+                        variant="primary",
+                        on_click=ui.Call("__panel__workspaces", refresh=True),
+                    ),
+                    ui.Button(
+                        label="Ask in chat instead",
+                        variant="ghost",
+                        on_click=ui.Send("Check my Notion access"),
+                    ),
+                ],
+            ),
+        ],
+    ))
+
+    return ui.Stack(direction="v", gap=4, children=children)
+
+
 @ext.panel("workspaces", slot="center", title="Notion", icon="BookOpen",
            center_overlay=True, refresh="manual")
 async def workspaces_panel(ctx, **kwargs):
-    """Render connected workspaces and explain the sharing model."""
+    """Render connected workspaces and explain the sharing model.
+
+    SKETCH -- workspaces panel
+      ui.Stack (v, gap=4)
+        ui.Header(text="Notion Connector", level=2, subtitle=...)
+        ui.Alert(...)                                   -- connection state
+        ui.Section(title="Connected workspaces", children=[
+          ui.DataTable(columns=[DataColumn dicts], rows=[plain dicts])
+          | ui.Empty(message=..., action=ui.Call("__panel__connect"))
+        ])
+        ui.Section(title="How access works", children=[
+          ui.Text(content=..., variant="body") x2   -- content=, NOT text=
+          ui.Button(...) / ui.Link(...)
+        ])
+    """
     refresh = bool(kwargs.get("refresh"))
 
     records: list[dict] = []
-    errors: list[str] = []
+    load_failed = False
     try:
-        records, errors = await ws.list_workspaces(ctx, refresh=refresh)
+        # Returns ONE list of records; each row carries its own status.
+        records = await ws.list_workspaces(ctx, refresh=refresh)
     except Exception:
         # The panel must still render: a blank screen is worse than a banner.
         # Detail goes to the audit log, never into the user-facing string.
         await ctx.log("workspaces panel failed to load workspaces", "error")
-        errors = ["Could not load workspaces just now. Try Re-check access."]
+        load_failed = True
 
     rows = [
         {
-            "name": r.get("name") or "Untitled workspace",
-            "accessible": str(r.get("accessible_objects", 0)),
-            "bot": r.get("bot_name") or "",
-            "status": "OK" if r.get("ok") else "Needs attention",
+            "workspace": r.get("workspace_name") or "Untitled workspace",
+            "integration": r.get("integration_name") or "",
+            "status": "Ready" if r.get("status") == "ok" else "Needs attention",
         }
         for r in records
     ]
 
     if rows:
-        table = ui.DataTable(
+        body = ui.DataTable(
             columns=[
-                ui.DataColumn(key="name", label="Workspace"),
-                ui.DataColumn(key="accessible", label="Shared objects"),
-                ui.DataColumn(key="bot", label="Integration"),
+                ui.DataColumn(key="workspace", label="Workspace"),
+                ui.DataColumn(key="integration", label="Integration"),
                 ui.DataColumn(key="status", label="Status"),
             ],
             rows=rows,
         )
     else:
-        table = ui.Empty(
-            message="No workspace connected yet -- add a token in the Secrets tab.",
+        body = ui.Empty(
+            message="No Notion workspace connected yet.",
+            action=ui.Call("__panel__connect"),
         )
+
+    alert = (
+        ui.Alert(
+            title="Could not load workspaces",
+            message="Something went wrong on our side. Try Re-check access.",
+            type="error",
+        )
+        if load_failed
+        else _state_alert(records)
+    )
 
     return ui.Stack(
         direction="v",
@@ -128,8 +295,8 @@ async def workspaces_panel(ctx, **kwargs):
                 level=2,
                 subtitle="Search, read and update Notion from Imperal",
             ),
-            _state_alert(len(records), errors),
-            ui.Section(title="Connected workspaces", children=[table]),
+            alert,
+            ui.Section(title="Connected workspaces", children=[body]),
             ui.Section(
                 title="How access works",
                 children=[
@@ -157,6 +324,11 @@ async def workspaces_panel(ctx, **kwargs):
                                 variant="secondary",
                                 on_click=ui.Call("__panel__workspaces", refresh=True),
                             ),
+                            ui.Button(
+                                label="Connect another workspace",
+                                variant="ghost",
+                                on_click=ui.Call("__panel__connect"),
+                            ),
                             ui.Link(
                                 label="Open notion.so/my-integrations",
                                 href=_INTEGRATIONS_URL,
@@ -172,18 +344,17 @@ async def workspaces_panel(ctx, **kwargs):
 @ext.panel("notion_nav", slot="left", title="Notion", icon="BookOpen",
            refresh="manual")
 async def notion_nav(ctx, **kwargs):
-    """Sidebar entry: connection state at a glance, and a way into the panel.
+    """Sidebar entry: connection state at a glance, and a way in.
 
-    SKETCH -- left nav panel (props checked against ui-components-reference)
+    SKETCH -- left nav panel
       ui.Stack (v, gap=2)
-        ui.Text(content=<"N workspaces" | "Not connected">, variant="body")
-        ui.Button(label="Open Notion panel", variant="secondary",
-                  full_width=True, on_click=ui.Call("__panel__workspaces"))
-        ui.Button(label="Check access", variant="ghost", full_width=True,
-                  on_click=ui.Send("Check my Notion access"))
+        ui.Text(content=<state>, variant="body")
+        ui.Button("Connect Notion" | "Open Notion panel", full_width=True)
+        ui.Button("Check access", variant="ghost", full_width=True)
 
-    Deliberately tiny: the sidebar is for orientation, not for data. Anything
-    that needs a table lives in the center panel.
+    Deliberately tiny: the sidebar is for orientation, not for data. The first
+    button changes with state -- an unconfigured app should offer the ONE
+    action that unblocks it.
     """
     try:
         records = await ws.list_workspaces(ctx)
@@ -191,23 +362,30 @@ async def notion_nav(ctx, **kwargs):
         # The sidebar must never be the thing that breaks the shell.
         records = []
 
+    usable = sum(1 for r in records if r.get("status") == "ok")
     if not records:
         state = "Not connected yet"
+        primary = ui.Button(
+            label="Connect Notion",
+            variant="primary",
+            full_width=True,
+            on_click=ui.Call("__panel__connect"),
+        )
     else:
-        usable = sum(1 for r in records if r.get("status") == "ok")
         state = f"{usable} of {len(records)} workspace(s) ready"
+        primary = ui.Button(
+            label="Open Notion panel",
+            variant="secondary",
+            full_width=True,
+            on_click=ui.Call("__panel__workspaces"),
+        )
 
     return ui.Stack(
-        direction="vertical",
+        direction="v",
         gap=2,
         children=[
             ui.Text(content=state, variant="body"),
-            ui.Button(
-                label="Open Notion panel",
-                variant="secondary",
-                full_width=True,
-                on_click=ui.Call("__panel__workspaces"),
-            ),
+            primary,
             ui.Button(
                 label="Check access",
                 variant="ghost",

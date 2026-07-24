@@ -2211,8 +2211,14 @@
   "required_scopes": [],
   "icon_size_bytes": 534,
   "lifecycle": {
+    "on_install": true,
     "health_check": {
       "interval_sec": 60
+    }
+  },
+  "lifecycle_hooks": {
+    "on_install": {
+      "signature": "(ctx)"
     }
   },
   "secrets": [
@@ -2235,6 +2241,15 @@
       "icon": "KeyRound",
       "refresh": "manual",
       "center_overlay": false
+    },
+    {
+      "panel_id": "connect",
+      "slot": "center",
+      "title": "Connect Notion",
+      "tree": {},
+      "icon": "Plug",
+      "refresh": "manual",
+      "center_overlay": true
     },
     {
       "panel_id": "workspaces",

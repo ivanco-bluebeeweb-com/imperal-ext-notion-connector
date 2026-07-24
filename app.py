@@ -78,3 +78,19 @@ async def health_check(ctx) -> dict:
         "detail": ("No Notion integration token configured yet."
                    if count == 0 else f"{count} workspace token(s) configured."),
     }
+
+
+@ext.on_install
+async def on_install(ctx):
+    """Make the first step traceable — and knowable.
+
+    A Notion integration token cannot be provisioned for the user, so a fresh
+    install is inert by design until a token is pasted. Recording that at
+    install time means "nothing works yet" shows up as an expected state in the
+    audit log rather than looking like a broken deployment.
+    """
+    await ctx.log(
+        "Notion Connector installed — awaiting an integration token; "
+        "the Connect panel walks the user through it.",
+        level="info",
+    )
