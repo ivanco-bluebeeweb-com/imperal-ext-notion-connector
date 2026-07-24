@@ -20,7 +20,12 @@ import notion_client as nc
 import notion_objects as no
 import workspaces as ws
 from app import chat
-from handlers_read import SHARING_NOTE, _error, _from_envelope, _resolve
+import shared
+from shared import SHARING_NOTE
+
+_error = shared.error
+_from_envelope = shared.from_envelope
+_resolve = shared.resolve
 from models import (
     AddCommentParams,
     CreateDatabaseParams,

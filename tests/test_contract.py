@@ -14,8 +14,8 @@ import ast
 import pathlib
 
 APP_DIR = pathlib.Path(__file__).resolve().parent.parent
-HANDLER_FILES = ["handlers_read.py", "handlers_write.py", "workspaces.py",
-                 "notion_client.py", "panels.py"]
+HANDLER_FILES = ["handlers_read.py", "handlers_write.py", "shared.py",
+                 "workspaces.py", "notion_client.py", "panels.py"]
 
 
 def _tree(name: str) -> ast.AST:
@@ -50,14 +50,14 @@ def test_every_error_result_carries_a_structured_code():
 
 
 def test_the_local_error_helper_always_requires_a_code():
-    """_error(message, code) — code is positional and mandatory, never defaulted.
+    """shared.error(message, code) — code is positional and mandatory.
 
     A default would let a call site silently omit it, which is exactly how the
     unstructured-error bug happened before.
     """
-    tree = _tree("handlers_read.py")
+    tree = _tree("shared.py")
     helper = next(n for n in ast.walk(tree)
-                  if isinstance(n, ast.FunctionDef) and n.name == "_error")
+                  if isinstance(n, ast.FunctionDef) and n.name == "error")
     args = [a.arg for a in helper.args.args]
     assert args[:2] == ["message", "code"]
     # defaults align to the TAIL of the arg list; `code` must not have one.
