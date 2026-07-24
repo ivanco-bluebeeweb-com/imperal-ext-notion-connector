@@ -43,28 +43,39 @@ def _dump(node) -> str:
 
 # --- the connect screen -----------------------------------------------------
 
-async def test_connect_screen_offers_a_masked_field_not_a_plain_input(ctx):
-    """ui.Password is the required credential surface (EXT-SECRETS-V1).
+async def test_connect_screen_renders_no_credential_field_of_its_own(ctx):
+    """The token field must NOT live in this panel.
 
-    ui.Password is a thin wrapper that returns an Input node carrying
-    type="password", so the masking — not the node name — is the contract.
+    `notion_tokens` is write_mode="user": ctx.secrets.set() raises
+    SecretWriteForbidden, so extension code cannot store it. The docs recipe
+    shows ui.Form(action="save_app_secret"), but a panel action resolves
+    against THIS extension and save_app_secret belongs to the developer
+    extension -- it failed with "Function not found". So the screen instructs
+    and hands over; it never captures the value.
     """
     tree = await panels.connect_panel(ctx)
-    fields = [n for n in _flatten(tree) if n.type == "Input"]
-    assert len(fields) == 1, "exactly one credential field"
-    assert fields[0].props["type"] == "password"
-    assert fields[0].props["param_name"] == "value"
+    types = _types(tree)
+    assert "Form" not in types
+    assert "Input" not in types
+    assert "Password" not in types
 
 
-async def test_connect_form_posts_to_the_platform_secret_action(ctx):
-    """Extension code cannot write a write_mode='user' secret itself."""
+async def test_connect_screen_hands_over_to_the_canonical_secrets_route(ctx):
+    """The handover target is the route the SDK's own secrets panel uses."""
     tree = await panels.connect_panel(ctx)
-    form = next(n for n in _flatten(tree) if n.type == "Form")
-    assert form.props["action"] == "save_app_secret"
-    assert form.props["defaults"] == {
-        "app_id": "notion-connector",
-        "name": "notion_tokens",
-    }
+    targets = [
+        n.props["on_click"].params.get("path", "")
+        for n in _flatten(tree)
+        if n.type == "Button" and hasattr(n.props.get("on_click"), "params")
+    ]
+    assert "/ext/notion-connector/secrets#notion_tokens" in targets
+
+
+async def test_connect_screen_never_shows_a_token(connected_ctx, http):
+    """Nothing on this screen may echo a stored credential back."""
+    http.push(bot_payload_default())
+    body = _dump(await panels.connect_panel(connected_ctx))
+    assert "ntn_test_token_one" not in body
 
 
 async def test_connect_screen_tells_the_user_which_integration_type(ctx):
@@ -84,14 +95,6 @@ async def test_connect_warns_that_saving_replaces_existing_tokens(connected_ctx,
     http.push(bot_payload_default())
     body = _dump(await panels.connect_panel(connected_ctx))
     assert "replaces" in body
-
-
-async def test_connect_screen_never_renders_a_token_back(connected_ctx, http):
-    http.push(bot_payload_default())
-    tree = await panels.connect_panel(connected_ctx)
-    pwd = next(n for n in _flatten(tree) if n.type == "Input")
-    assert not pwd.props.get("value"), "the field must never be pre-filled"
-    assert "ntn_test_token_one" not in _dump(tree)
 
 
 # --- the workspaces panel ---------------------------------------------------

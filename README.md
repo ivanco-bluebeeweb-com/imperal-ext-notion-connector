@@ -10,10 +10,17 @@ Notion is **not** one of the providers the platform's OAuth flow supports
 (`ctx.oauth_authorize_url` accepts google / microsoft / yahoo only), so the
 connector uses Notion **internal integration tokens**.
 
+Open the app's **Connect Notion** screen — it walks through all three steps and
+links straight to the token field.
+
 1. Open <https://www.notion.so/my-integrations> → **New integration**, pick the
    workspace, and copy its **Internal Integration Secret** (`ntn_...`).
-2. In Imperal, open the app's **Secrets** and paste the token into
-   `notion_tokens`.
+   Choose **Internal**: a public integration is what asks for a redirect URI,
+   which this connector does not use.
+2. Paste it into `notion_tokens` in the **Secrets** manager (the Connect screen
+   has a button that opens it). The field lives there because a
+   `write_mode="user"` secret can only be written by Panel UI — never by the
+   app's own code.
 3. In Notion, open each page or database the connector should reach → **⋯** →
    **Connections** → add the integration. Subpages inherit that access.
 

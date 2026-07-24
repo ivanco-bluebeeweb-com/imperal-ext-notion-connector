@@ -12,10 +12,25 @@ Three surfaces, in the order a new user meets them:
 
 CREDENTIAL HANDLING (federal EXT-SECRETS-V1)
 ``notion_tokens`` is declared ``write_mode="user"``, so extension code CANNOT
-write it -- ``ctx.secrets.set()`` raises SecretWriteForbidden. The sanctioned
-path is a ``ui.Form`` posting to the platform action ``save_app_secret`` with a
-``ui.Password`` child, so the plaintext goes straight from the browser to the
-auth gateway and is Vault-encrypted. No panel here ever reads a token back.
+write it -- ``ctx.secrets.set()`` raises SecretWriteForbidden. Only Panel UI
+may write it.
+
+These panels therefore never capture the token themselves. The docs recipe
+(recipes/handle-user-api-keys) shows ``ui.Form(action="save_app_secret")``, but
+a panel ``action`` is resolved against the FUNCTIONS OF THIS EXTENSION, and
+``save_app_secret`` belongs to the developer extension -- so it fails at click
+time with "Function 'save_app_secret' not found in 'notion-connector'". That
+recipe snippet only works from inside the extension that owns the action.
+
+The SDK's own built-in secrets handler reaches the same conclusion for the same
+reason and says so explicitly: it refuses to inline an input form because the
+canonical credential UI lives in Panel React (SecretManagerCard), and
+duplicating it in ui.* primitives would split the federal contract. It
+navigates to ``/ext/<ext_id>/secrets`` instead.
+
+So the Connect screen owns the EXPLANATION -- which integration type, why no
+redirect URI, what sharing still has to happen -- and hands the actual keystroke
+over to that route. No panel here ever reads a token back.
 """
 
 from __future__ import annotations
@@ -27,9 +42,14 @@ from app import ext
 
 _INTEGRATIONS_URL = "https://www.notion.so/my-integrations"
 
-# The app_id the platform action needs, and the declared secret name.
-_APP_ID = "notion-connector"
 _SECRET_NAME = "notion_tokens"
+
+# The canonical credential route. The SDK's own built-in secrets panel sends
+# users to exactly this path, where Panel React's SecretManagerCard owns the
+# input -- that component, not a panel form, is the federal EXT-SECRETS-V1
+# surface (no echo, cleared on submit). Derived from the Extension so it can
+# never drift from the real id.
+_SECRETS_ROUTE = f"/ext/{ext.app_id}/secrets#{_SECRET_NAME}"
 
 
 def _errors_of(records: list[dict]) -> list[str]:
@@ -98,10 +118,9 @@ async def connect_panel(ctx, **kwargs):
           ui.Link(label="Open notion.so/my-integrations", href=...)
         ])
         ui.Section(title="2. Paste the token", children=[
-          ui.Form(action="save_app_secret", submit_label="Connect",
-                  defaults={"app_id": ..., "name": ...},
-                  children=[ui.Password(placeholder="ntn_...",
-                                        param_name="value")])
+          ui.Text(content=..., variant="body")
+          ui.Button(label="Open the token field", variant="primary",
+                    on_click=ui.Navigate(_SECRETS_ROUTE))   -- canonical route
         ])
         ui.Section(title="3. Share your pages", children=[
           ui.Text(content=..., variant="body")
@@ -109,10 +128,16 @@ async def connect_panel(ctx, **kwargs):
         ])
 
     Checklist notes:
-      * ui.Password -- NOT ui.Input -- is the required credential surface, and
-        the value never round-trips back into the panel.
-      * ui.Form(action="save_app_secret") posts to the platform action; the
-        extension cannot write a write_mode="user" secret itself.
+      * NO credential field is rendered here. `notion_tokens` is
+        write_mode="user", so ctx.secrets.set() raises SecretWriteForbidden --
+        only Panel UI may write it. The docs recipe shows
+        ui.Form(action="save_app_secret"), but that action belongs to the
+        DEVELOPER extension; a panel action resolves against THIS extension,
+        so it fails with "Function not found". The SDK's own secrets handler
+        takes the same decision: it refuses to inline a form and navigates to
+        /ext/<ext_id>/secrets instead, where the federal SecretManagerCard
+        (no-echo, cleared-on-submit) owns the input. This screen therefore
+        carries the instructions and hands over to that route.
       * slot="center" REQUIRES center_overlay=True, else it is never fetched.
       * ui.Section always gets children=; ui.Text takes content=, not text=.
     """
@@ -174,16 +199,17 @@ async def connect_panel(ctx, **kwargs):
                 ),
                 variant="body",
             ),
-            ui.Form(
-                action="save_app_secret",
-                submit_label="Connect",
-                defaults={"app_id": _APP_ID, "name": _SECRET_NAME},
-                children=[
-                    ui.Password(
-                        placeholder="ntn_...",
-                        param_name="value",
-                    ),
-                ],
+            ui.Button(
+                label="Open the token field",
+                variant="primary",
+                on_click=ui.Navigate(_SECRETS_ROUTE),
+            ),
+            ui.Text(
+                content=(
+                    "The field opens in the Secrets manager. Paste the token "
+                    "there and save -- then come back and check access."
+                ),
+                variant="caption",
             ),
         ],
     ))
