@@ -14,7 +14,7 @@ SKETCH -- workspaces panel (every component checked against PRE-PANEL CHECKLIST)
       | ui.Empty(message=...)                       -- never return None
     ])
     ui.Section(title="How access works", children=[
-      ui.Text(variant="body") x2
+      ui.Text(content=..., variant="body") x2   -- content=, NOT text=
       ui.Button(label="Re-check access", variant="secondary",
                 on_click=ui.Call("__panel__workspaces", refresh=True))
       ui.Link(label="Open notion.so/my-integrations", href=...)
@@ -134,7 +134,7 @@ async def workspaces_panel(ctx, **kwargs):
                 title="How access works",
                 children=[
                     ui.Text(
-                        text=(
+                        content=(
                             "This connector sees only what you explicitly share "
                             "with the integration. It does not get your whole "
                             "workspace automatically."
@@ -142,7 +142,7 @@ async def workspaces_panel(ctx, **kwargs):
                         variant="body",
                     ),
                     ui.Text(
-                        text=(
+                        content=(
                             "To share a page or database: open it in Notion, "
                             "click the three-dot menu, choose Connections, and "
                             "add the integration. Subpages inherit that access."
@@ -164,6 +164,55 @@ async def workspaces_panel(ctx, **kwargs):
                         ],
                     ),
                 ],
+            ),
+        ],
+    )
+
+
+@ext.panel("notion_nav", slot="left", title="Notion", icon="BookOpen",
+           refresh="manual")
+async def notion_nav(ctx, **kwargs):
+    """Sidebar entry: connection state at a glance, and a way into the panel.
+
+    SKETCH -- left nav panel (props checked against ui-components-reference)
+      ui.Stack (v, gap=2)
+        ui.Text(content=<"N workspaces" | "Not connected">, variant="body")
+        ui.Button(label="Open Notion panel", variant="secondary",
+                  full_width=True, on_click=ui.Call("__panel__workspaces"))
+        ui.Button(label="Check access", variant="ghost", full_width=True,
+                  on_click=ui.Send("Check my Notion access"))
+
+    Deliberately tiny: the sidebar is for orientation, not for data. Anything
+    that needs a table lives in the center panel.
+    """
+    try:
+        records = await ws.list_workspaces(ctx)
+    except Exception:
+        # The sidebar must never be the thing that breaks the shell.
+        records = []
+
+    if not records:
+        state = "Not connected yet"
+    else:
+        usable = sum(1 for r in records if r.get("status") == "ok")
+        state = f"{usable} of {len(records)} workspace(s) ready"
+
+    return ui.Stack(
+        direction="vertical",
+        gap=2,
+        children=[
+            ui.Text(content=state, variant="body"),
+            ui.Button(
+                label="Open Notion panel",
+                variant="secondary",
+                full_width=True,
+                on_click=ui.Call("__panel__workspaces"),
+            ),
+            ui.Button(
+                label="Check access",
+                variant="ghost",
+                full_width=True,
+                on_click=ui.Send("Check my Notion access"),
             ),
         ],
     )

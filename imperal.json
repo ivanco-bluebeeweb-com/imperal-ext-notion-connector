@@ -2244,6 +2244,15 @@
       "icon": "BookOpen",
       "refresh": "manual",
       "center_overlay": true
+    },
+    {
+      "panel_id": "notion_nav",
+      "slot": "left",
+      "title": "Notion",
+      "tree": {},
+      "icon": "BookOpen",
+      "refresh": "manual",
+      "center_overlay": false
     }
   ]
 }
