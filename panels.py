@@ -119,8 +119,10 @@ async def connect_panel(ctx, **kwargs):
         ])
         ui.Section(title="2. Paste the token", children=[
           ui.Text(content=..., variant="body")
-          ui.Button(label="Open the token field", variant="primary",
-                    on_click=ui.Navigate(_SECRETS_ROUTE))   -- canonical route
+          ui.Form(action="connect_workspace", submit_label="Connect", children=[
+            ui.Password(placeholder="ntn_...", param_name="token")
+          ])
+          ui.Link(label="Or manage the stored tokens directly", href=_SECRETS_ROUTE)
         ])
         ui.Section(title="3. Share your pages", children=[
           ui.Text(content=..., variant="body")
@@ -128,16 +130,23 @@ async def connect_panel(ctx, **kwargs):
         ])
 
     Checklist notes:
-      * NO credential field is rendered here. `notion_tokens` is
-        write_mode="user", so ctx.secrets.set() raises SecretWriteForbidden --
-        only Panel UI may write it. The docs recipe shows
-        ui.Form(action="save_app_secret"), but that action belongs to the
-        DEVELOPER extension; a panel action resolves against THIS extension,
-        so it fails with "Function not found". The SDK's own secrets handler
-        takes the same decision: it refuses to inline a form and navigates to
-        /ext/<ext_id>/secrets instead, where the federal SecretManagerCard
-        (no-echo, cleared-on-submit) owns the input. This screen therefore
-        carries the instructions and hands over to that route.
+      * The token field submits to `connect_workspace`, a function of THIS
+        extension. A panel form's action= resolves against the rendering
+        extension's own functions, which is why the documented
+        ui.Form(action="save_app_secret") could never work here:
+        save_app_secret belongs to the DEVELOPER extension, so clicking it
+        failed with "Function not found in 'notion-connector'".
+      * That handler can store the value because `notion_tokens` is declared
+        write_mode="both" -- Panel UI *and* extension code may write it. It was
+        write_mode="user", which made ctx.secrets.set() raise
+        SecretWriteForbidden and left this screen with nothing it could call.
+      * Writing through our own handler also fixes the reported symptom "I
+        paste the key, press Save, the field clears and nothing happens": the
+        value now travels through the SAME secrets client that every read uses,
+        and the token is verified against Notion BEFORE it is stored, so the
+        user gets a verdict instead of silence.
+      * ui.Password returns an Input node with type="password" -- assert on
+        Input, not on a "Password" node type.
       * slot="center" REQUIRES center_overlay=True, else it is never fetched.
       * ui.Section always gets children=; ui.Text takes content=, not text=.
     """
@@ -155,17 +164,16 @@ async def connect_panel(ctx, **kwargs):
         )
     ]
 
-    # Saving REPLACES the whole secret, so an existing setup gets a warning
-    # rather than a silent overwrite of other workspaces' tokens.
+    # Tokens are APPENDED by connect_workspace, so an existing setup is safe --
+    # this is now reassurance, not a warning about clobbering other workspaces.
     if records:
         children.append(ui.Alert(
-            title=f"{len(records)} token(s) already saved",
+            title=f"{len(records)} workspace(s) already connected",
             message=(
-                "Saving here replaces the whole token list. To add another "
-                "workspace without losing this one, edit notion_tokens in the "
-                "Secrets tab and put each token on its own line."
+                "Adding another token here keeps the existing ones: each "
+                "workspace is a separate line in the stored value."
             ),
-            type="warn",
+            type="info",
         ))
 
     children.append(ui.Section(
@@ -194,22 +202,33 @@ async def connect_panel(ctx, **kwargs):
         children=[
             ui.Text(
                 content=(
-                    "The token is stored encrypted and is never shown back "
+                    "Paste it below. The token is checked against Notion "
+                    "before it is saved, so you find out immediately whether "
+                    "it works -- and it is stored encrypted, never shown back "
                     "here, not even to you."
                 ),
                 variant="body",
             ),
-            ui.Button(
-                label="Open the token field",
-                variant="primary",
-                on_click=ui.Navigate(_SECRETS_ROUTE),
+            ui.Form(
+                action="connect_workspace",
+                submit_label="Connect",
+                children=[
+                    ui.Password(
+                        placeholder="ntn_...",
+                        param_name="token",
+                    ),
+                ],
             ),
             ui.Text(
                 content=(
-                    "The field opens in the Secrets manager. Paste the token "
-                    "there and save -- then come back and check access."
+                    "Adding a second workspace? Paste its token here too -- "
+                    "each one is appended, not replaced."
                 ),
                 variant="caption",
+            ),
+            ui.Link(
+                label="Or manage the stored tokens directly",
+                href=_SECRETS_ROUTE,
             ),
         ],
     ))

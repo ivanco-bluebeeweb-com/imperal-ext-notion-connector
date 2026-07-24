@@ -28,6 +28,8 @@ _from_envelope = shared.from_envelope
 _resolve = shared.resolve
 from models import (
     AddCommentParams,
+    ConnectResult,
+    ConnectWorkspaceParams,
     CreateDatabaseParams,
     CreatePageParams,
     MovePageParams,
@@ -464,3 +466,60 @@ async def create_database(ctx, params: CreateDatabaseParams) -> ActionResult:
     )
     return ActionResult.success(
         result, f"Created database '{params.title}' with {len(columns)} column(s).")
+
+
+@chat.function(
+    "connect_workspace",
+    "Connect a Notion workspace by saving its integration token, after "
+    "checking the token actually works.",
+    action_type="write", chain_callable=True,
+    effects=["notion.workspace.connected"],
+    event="notion-connector.connect_workspace",
+    data_model=ConnectResult,
+)
+async def connect_workspace(ctx, params: ConnectWorkspaceParams) -> ActionResult:
+    """Store a Notion integration token -- verified first, appended not replaced.
+
+    This is the action the Connect panel's form submits, and it is a chat tool
+    for the same reason: "connect my Notion" should work in either surface.
+
+    Why the app writes the secret itself: `notion_tokens` is declared
+    write_mode="both", so this handler and the Panel Secrets manager are both
+    legal writers. Crucially, the write goes through the SAME secrets client
+    that every read uses, so a value reported as saved is a value the tools can
+    actually see -- previously it was possible for a save to succeed while the
+    runtime kept reading nothing.
+    """
+    out = await ws.add_token(ctx, params.token)
+    if not out.get("ok"):
+        return _from_envelope(out)
+
+    name = out.get("workspace_name") or "your Notion workspace"
+    count = int(out.get("count", 0))
+
+    if out.get("already_connected"):
+        detail = (f"{name} was already connected -- nothing changed. "
+                  f"{count} workspace(s) connected.")
+    else:
+        detail = (f"Connected {name}. {count} workspace(s) connected. "
+                  f"{SHARING_NOTE}")
+
+    record = ConnectResult(
+        id=out.get("workspace_name") or "notion-workspace",
+        title=f"Connected: {name}",
+        kind="notion_workspace",
+        workspace_name=out.get("workspace_name", ""),
+        integration_name=out.get("integration_name", ""),
+        already_connected=bool(out.get("already_connected")),
+        workspace_count=count,
+        next_step=SHARING_NOTE,
+        description=detail,
+    )
+    # data first, summary second (ActionResult.success signature).
+    # refresh_panels: the connect screen and the workspace list both show
+    # connection state, so they must not keep showing "not connected" after a
+    # successful save.
+    return ActionResult.success(
+        record, detail,
+        refresh_panels=["connect", "workspaces", "notion_nav"],
+    )

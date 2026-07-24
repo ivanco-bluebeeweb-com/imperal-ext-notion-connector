@@ -46,28 +46,130 @@ def normalize_id(value: str) -> str:
     return value.strip()
 
 
-async def load_tokens(ctx) -> list[str]:
-    """Read the configured integration tokens, one per line.
+SECRET_NAME = "notion_tokens"
+
+
+def split_tokens(raw: str) -> list[str]:
+    """One token per line, blanks dropped, duplicates removed.
 
     Blank lines and stray whitespace are tolerated: the user is pasting into a
     textarea, and a trailing newline should not create a phantom workspace.
+    Deduplicated so the same token pasted twice does not show up as two
+    identical workspaces in the picker.
     """
-    try:
-        raw = await ctx.secrets.get("notion_tokens")
-    except Exception:
-        return []
-    if not raw:
-        return []
     seen: set[str] = set()
     tokens: list[str] = []
-    for line in raw.splitlines():
+    for line in (raw or "").splitlines():
         token = line.strip()
-        # Deduplicated so the same token pasted twice does not show up as two
-        # identical workspaces in the picker.
         if token and token not in seen:
             seen.add(token)
             tokens.append(token)
     return tokens
+
+
+async def read_tokens(ctx) -> dict:
+    """Read the configured tokens, distinguishing EMPTY from UNREADABLE.
+
+    This used to be a bare `except Exception: return []`, which collapsed two
+    very different states into one: "the user has not connected yet" and "the
+    secret store did not answer". The caller then told the user to paste a
+    token -- useless advice if the store is simply unavailable, and it hides a
+    real outage behind a setup message. Both states now travel with their own
+    code so every caller can say something true.
+    """
+    try:
+        raw = await ctx.secrets.get(SECRET_NAME)
+    except Exception as exc:
+        # No plaintext can appear here: only the exception TYPE is recorded.
+        return nc.fail(nc.NOTION_SECRET_UNAVAILABLE,
+                       f"{nc.message_for(nc.NOTION_SECRET_UNAVAILABLE)} "
+                       f"({type(exc).__name__})")
+    return {"ok": True, "tokens": split_tokens(raw or "")}
+
+
+async def load_tokens(ctx) -> list[str]:
+    """Tokens only, for callers that treat unreadable as not-configured.
+
+    Kept so existing call sites stay short; anything that needs to explain WHY
+    there are no tokens should call `read_tokens` instead.
+    """
+    out = await read_tokens(ctx)
+    return out.get("tokens", []) if out.get("ok") else []
+
+
+MAX_SECRET_BYTES = 4096
+
+
+async def add_token(ctx, token: str) -> dict:
+    """Validate a token against Notion, then store it.
+
+    Deliberately verify-BEFORE-write. A store-then-check flow is what makes a
+    bad paste feel like a silent failure: the value lands, the panel clears,
+    and the user only learns it was wrong the next time they ask for something.
+    Here an unusable token is rejected with Notion's own reason and NOTHING is
+    written, so the app never holds a credential it knows is broken.
+
+    Appends rather than replaces: one Notion integration belongs to exactly one
+    workspace, so a second workspace means a second line.
+    """
+    token = (token or "").strip()
+    if not token:
+        return nc.fail(nc.NOTION_TOKEN_MISSING,
+                       "No token was entered. Paste the Internal Integration "
+                       "Secret from notion.so/my-integrations.")
+
+    # Notion's own verdict first -- identifies the workspace as a side effect.
+    info = await describe_token(ctx, token)
+    if not info.get("ok"):
+        return nc.fail(info.get("code") or nc.NOTION_TOKEN_REJECTED,
+                       info.get("error") or nc.message_for(nc.NOTION_TOKEN_REJECTED))
+
+    existing = await read_tokens(ctx)
+    if not existing.get("ok"):
+        return existing
+    tokens = existing["tokens"]
+
+    if token in tokens:
+        return {"ok": True, "already_connected": True,
+                "workspace_name": info.get("workspace_name", ""),
+                "integration_name": info.get("integration_name", ""),
+                "count": len(tokens)}
+
+    combined = tokens + [token]
+    payload = "\n".join(combined)
+    if len(payload.encode("utf-8")) > MAX_SECRET_BYTES:
+        return nc.fail(
+            nc.NOTION_VALIDATION_FAILED,
+            f"Adding this token would exceed the {MAX_SECRET_BYTES}-byte limit "
+            f"for the stored value ({len(tokens)} already saved). Remove an "
+            "unused token in the Secrets manager first.")
+
+    try:
+        await ctx.secrets.set(SECRET_NAME, payload)
+    except Exception as exc:
+        # Only the exception TYPE -- never the value -- is surfaced.
+        return nc.fail(nc.NOTION_SECRET_WRITE_FAILED,
+                       f"{nc.message_for(nc.NOTION_SECRET_WRITE_FAILED)} "
+                       f"({type(exc).__name__})")
+
+    # Drop the cached workspace list so the new one appears immediately instead
+    # of after the cache happens to expire.
+    await _forget_cache(ctx)
+
+    return {"ok": True, "already_connected": False,
+            "workspace_name": info.get("workspace_name", ""),
+            "integration_name": info.get("integration_name", ""),
+            "count": len(combined)}
+
+
+async def _forget_cache(ctx) -> None:
+    """Clear cached workspace rows; failure here is not worth failing a save."""
+    try:
+        page = await ctx.store.query(WORKSPACES_COLLECTION, limit=100)
+        for doc in page.data:
+            await ctx.store.delete(WORKSPACES_COLLECTION, doc.id)
+    except Exception:
+        pass
 
 
 async def describe_token(ctx, token: str) -> dict:

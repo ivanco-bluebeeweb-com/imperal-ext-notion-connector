@@ -43,32 +43,55 @@ def _dump(node) -> str:
 
 # --- the connect screen -----------------------------------------------------
 
-async def test_connect_screen_renders_no_credential_field_of_its_own(ctx):
-    """The token field must NOT live in this panel.
+async def test_connect_screen_submits_to_a_function_of_THIS_extension(ctx):
+    """The form's action must be one of our own functions.
 
-    `notion_tokens` is write_mode="user": ctx.secrets.set() raises
-    SecretWriteForbidden, so extension code cannot store it. The docs recipe
-    shows ui.Form(action="save_app_secret"), but a panel action resolves
-    against THIS extension and save_app_secret belongs to the developer
-    extension -- it failed with "Function not found". So the screen instructs
-    and hands over; it never captures the value.
+    A panel form's `action=` is resolved against the functions of the extension
+    that rendered the panel. The docs recipe suggests
+    ui.Form(action="save_app_secret"), which belongs to the DEVELOPER
+    extension, so clicking Connect died with
+    "Function 'save_app_secret' not found in 'notion-connector'".
+    connect_workspace is ours, so it resolves.
     """
     tree = await panels.connect_panel(ctx)
-    types = _types(tree)
-    assert "Form" not in types
-    assert "Input" not in types
-    assert "Password" not in types
+    form = next(n for n in _flatten(tree) if n.type == "Form")
+    assert form.props["action"] == "connect_workspace"
+
+    # Guard the regression directly: never target another app's function.
+    assert form.props["action"] != "save_app_secret"
 
 
-async def test_connect_screen_hands_over_to_the_canonical_secrets_route(ctx):
-    """The handover target is the route the SDK's own secrets panel uses."""
+def test_the_form_action_is_a_registered_function_of_this_extension():
+    """Static proof, independent of the panel: the action really exists.
+
+    A form action that does not resolve fails at CLICK time, not at build or
+    validate time -- exactly why the first version shipped broken. Asserting
+    against the registry catches a rename before a user does.
+    """
+    import main  # noqa: F401  -- registers every handler module
+    from app import ext
+
+    names = {f.name for f in ext.functions} if hasattr(ext, "functions") else set()
+    if not names:  # registry shape differs across SDK versions
+        import handlers_write
+        names = {"connect_workspace"} & set(dir(handlers_write))
+    assert "connect_workspace" in names
+
+
+async def test_connect_field_is_masked_and_never_prefilled(ctx):
+    """ui.Password renders an Input pinned to type='password' (EXT-SECRETS-V1)."""
     tree = await panels.connect_panel(ctx)
-    targets = [
-        n.props["on_click"].params.get("path", "")
-        for n in _flatten(tree)
-        if n.type == "Button" and hasattr(n.props.get("on_click"), "params")
-    ]
-    assert "/ext/notion-connector/secrets#notion_tokens" in targets
+    fields = [n for n in _flatten(tree) if n.type == "Input"]
+    assert len(fields) == 1, "exactly one credential field"
+    assert fields[0].props["type"] == "password"
+    assert fields[0].props["param_name"] == "token"
+    assert not fields[0].props.get("value"), "must never be pre-filled"
+
+
+async def test_connect_screen_still_links_to_the_secrets_manager(ctx):
+    """The manual route stays available for editing/removing stored tokens."""
+    body = _dump(await panels.connect_panel(ctx))
+    assert "/ext/notion-connector/secrets#notion_tokens" in body
 
 
 async def test_connect_screen_never_shows_a_token(connected_ctx, http):
@@ -90,11 +113,18 @@ async def test_connect_screen_explains_sharing_since_a_fresh_token_sees_nothing(
     assert "Connections" in body
 
 
-async def test_connect_warns_that_saving_replaces_existing_tokens(connected_ctx, http):
-    """save_app_secret overwrites the whole value — silence would lose tokens."""
+async def test_connect_reassures_that_an_existing_workspace_is_kept(connected_ctx, http):
+    """Adding a token must not look like it will clobber the current setup.
+
+    Earlier this screen WARNED that saving replaces the whole value, because
+    the only way in was the Secrets manager, where the stored string is edited
+    wholesale. connect_workspace appends instead, so the honest message is now
+    reassurance -- and the old warning would be a lie.
+    """
     http.push(bot_payload_default())
     body = _dump(await panels.connect_panel(connected_ctx))
-    assert "replaces" in body
+    assert "keeps the existing ones" in body
+    assert "replaces" not in body
 
 
 # --- the workspaces panel ---------------------------------------------------

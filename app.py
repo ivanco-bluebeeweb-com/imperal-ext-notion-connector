@@ -53,7 +53,16 @@ ext.secret(
     "Create at notion.so/my-integrations, then share the pages or databases "
     "the integration should reach.",
     required=True,
-    write_mode="user",
+    # "both" -- Panel UI writes it (Secrets manager) AND the app writes it
+    # itself from the Connect screen.
+    #
+    # It was "user" (Panel-only). That left the app unable to store a token at
+    # all, with two consequences: a panel form had no action it could legally
+    # call, and saving through the owner-facing route reported success while
+    # the extension runtime still read nothing back -- a save that looked like
+    # a no-op. With "both" the value is written through the very same client
+    # that later reads it, so "saved" and "visible" cannot disagree.
+    write_mode="both",
     max_bytes=4096,
     rotation_hint_days=180,
 )(lambda: None)

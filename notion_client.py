@@ -42,6 +42,12 @@ NOTION_WORKSPACE_UNKNOWN = "NOTION_WORKSPACE_UNKNOWN"
 NOTION_TARGET_NOT_FOUND = "NOTION_TARGET_NOT_FOUND"
 NOTION_TARGET_AMBIGUOUS = "NOTION_TARGET_AMBIGUOUS"
 NOTION_CAPABILITY_MISSING = "NOTION_CAPABILITY_MISSING"
+# Credential STORAGE failures -- deliberately distinct from "no token
+# configured". Without these, an unreadable or unwritable secret store surfaced
+# as NOTION_TOKEN_MISSING: "paste your token" advice for a problem no amount of
+# pasting can fix.
+NOTION_SECRET_UNAVAILABLE = "NOTION_SECRET_UNAVAILABLE"
+NOTION_SECRET_WRITE_FAILED = "NOTION_SECRET_WRITE_FAILED"
 NOTION_NO_DATA_SOURCE = "NOTION_NO_DATA_SOURCE"
 
 # Notion's own `code` field is more precise than the HTTP status, so it wins.
@@ -94,10 +100,20 @@ _MESSAGES = {
     "BACKEND_5XX": "Notion returned a server error -- try again shortly.",
     "BACKEND_TIMEOUT": "Notion took too long to respond -- try again shortly.",
     NOTION_UNREACHABLE: "Could not reach the Notion API.",
+    NOTION_SECRET_UNAVAILABLE: (
+        "The secure store holding your Notion token could not be read just "
+        "now, so the connection state is unknown. This is not a problem with "
+        "your token -- try again shortly."
+    ),
+    NOTION_SECRET_WRITE_FAILED: (
+        "The token could not be saved to the secure store, so nothing was "
+        "changed. Try again shortly."
+    ),
 }
 
 _RETRYABLE = {"RATE_LIMITED", "BACKEND_5XX", "BACKEND_TIMEOUT",
-              NOTION_CONFLICT, NOTION_UNREACHABLE}
+              NOTION_CONFLICT, NOTION_UNREACHABLE,
+              NOTION_SECRET_UNAVAILABLE, NOTION_SECRET_WRITE_FAILED}
 
 
 def is_retryable(code: str) -> bool:

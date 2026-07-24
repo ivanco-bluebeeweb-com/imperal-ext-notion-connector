@@ -2204,6 +2204,139 @@
       "long_running": false,
       "scopes": [],
       "owner_chat_tool": "notion"
+    },
+    {
+      "name": "connect_workspace",
+      "description": "Connect a Notion workspace by saving its integration token, after checking the token actually works.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "notion.workspace.connected"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "The token the user pastes on the Connect screen.\n\nNot WorkspaceScoped: this is the one action that runs BEFORE any workspace\nexists, so asking which workspace to act in would be circular. The\nworkspace is discovered FROM the token.",
+        "properties": {
+          "token": {
+            "default": "",
+            "description": "Notion Internal Integration Secret, starts with 'ntn_'. Create one at notion.so/my-integrations.",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "title": "ConnectWorkspaceParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of connecting a token -- what got connected, and what is next.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "workspace_name": {
+            "default": "",
+            "title": "Workspace Name",
+            "type": "string"
+          },
+          "integration_name": {
+            "default": "",
+            "title": "Integration Name",
+            "type": "string"
+          },
+          "already_connected": {
+            "default": false,
+            "title": "Already Connected",
+            "type": "boolean"
+          },
+          "workspace_count": {
+            "default": 0,
+            "title": "Workspace Count",
+            "type": "integer"
+          },
+          "next_step": {
+            "default": "",
+            "title": "Next Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ConnectResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "notion-connector.connect_workspace",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
     }
   ],
   "signals": [],
@@ -2226,7 +2359,7 @@
       "name": "notion_tokens",
       "description": "Notion integration token(s) -- one per line, one line per workspace. Create at notion.so/my-integrations, then share the pages or databases the integration should reach.",
       "required": true,
-      "write_mode": "user",
+      "write_mode": "both",
       "max_bytes": 4096,
       "scope": "user",
       "rotation_hint_days": 180

@@ -11,23 +11,31 @@ Notion is **not** one of the providers the platform's OAuth flow supports
 connector uses Notion **internal integration tokens**.
 
 Open the app's **Connect Notion** screen — it walks through all three steps and
-links straight to the token field.
+has the token field right on it.
 
 1. Open <https://www.notion.so/my-integrations> → **New integration**, pick the
    workspace, and copy its **Internal Integration Secret** (`ntn_...`).
    Choose **Internal**: a public integration is what asks for a redirect URI,
    which this connector does not use.
-2. Paste it into `notion_tokens` in the **Secrets** manager (the Connect screen
-   has a button that opens it). The field lives there because a
-   `write_mode="user"` secret can only be written by Panel UI — never by the
-   app's own code.
+2. Paste it into the field on the Connect screen and press **Connect**. The
+   token is checked against Notion *before* it is stored, so a bad paste is
+   reported immediately instead of failing later — and a successful one tells
+   you which workspace it connected. (You can also edit `notion_tokens`
+   directly in the **Secrets** manager.)
 3. In Notion, open each page or database the connector should reach → **⋯** →
    **Connections** → add the integration. Subpages inherit that access.
 
 **Several workspaces?** A Notion integration belongs to exactly one workspace,
-so connect one integration per workspace and paste **one token per line**. The
-connector reads each token's workspace name from Notion and lets you say
-*"in Acme HQ"*; with a single workspace you never have to name it.
+so connect one integration per workspace: paste the second token on the same
+screen and it is **appended**, one token per line — the workspaces you already
+connected are kept. The connector reads each token's workspace name from Notion
+and lets you say *"in Acme HQ"*; with a single workspace you never have to name
+it.
+
+The secret is declared `write_mode="both"`, so both the Panel Secrets manager
+and this app's own `connect_workspace` handler may write it. That matters: the
+handler writes through the same secrets client every read uses, so a token
+reported as saved is a token the tools can actually see.
 
 Tokens live only in the Vault-encrypted secret. The app's own store keeps
 workspace names and ids — never a token.

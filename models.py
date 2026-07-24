@@ -24,6 +24,27 @@ class ListWorkspacesParams(BaseModel):
         False, description="Re-read workspace details from Notion instead of the cache")
 
 
+class ConnectWorkspaceParams(BaseModel):
+    """The token the user pastes on the Connect screen.
+
+    Not WorkspaceScoped: this is the one action that runs BEFORE any workspace
+    exists, so asking which workspace to act in would be circular. The
+    workspace is discovered FROM the token.
+    """
+    token: str = Field(
+        "", description="Notion Internal Integration Secret, starts with 'ntn_'. "
+                        "Create one at notion.so/my-integrations.")
+
+
+class ConnectResult(sdl.Entity):
+    """Outcome of connecting a token -- what got connected, and what is next."""
+    workspace_name: str = ""
+    integration_name: str = ""
+    already_connected: bool = False
+    workspace_count: int = 0
+    next_step: str = ""
+
+
 class SearchParams(WorkspaceScoped):
     query: str = Field(
         "", description="Text to search for in page and database titles. "
