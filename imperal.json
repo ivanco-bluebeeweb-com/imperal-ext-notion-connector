@@ -1,0 +1,2249 @@
+{
+  "manifest_schema_version": 3,
+  "sdk_version": "5.9.12",
+  "app_id": "notion-connector",
+  "version": "1.0.0",
+  "name": "Notion Connector",
+  "description": "Read and operate on Notion workspaces: search, browse pages and their actual block content, query databases, create and update pages, comment, and manage database records across multiple workspaces.",
+  "icon": "icon.svg",
+  "actions_explicit": true,
+  "system": false,
+  "capabilities": [
+    "notion:read",
+    "notion:write"
+  ],
+  "tools": [
+    {
+      "name": "list_workspaces",
+      "description": "List the connected Notion workspaces and whether each token still works.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "refresh": {
+            "default": false,
+            "description": "Re-read workspace details from Notion instead of the cache",
+            "title": "Refresh",
+            "type": "boolean"
+          }
+        },
+        "title": "ListWorkspacesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One connected Notion workspace.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "workspace_name": {
+            "default": "",
+            "title": "Workspace Name",
+            "type": "string"
+          },
+          "workspace_id": {
+            "default": "",
+            "title": "Workspace Id",
+            "type": "string"
+          },
+          "integration_name": {
+            "default": "",
+            "title": "Integration Name",
+            "type": "string"
+          },
+          "state": {
+            "default": "",
+            "title": "State",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "WorkspaceRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "search",
+      "description": "Search pages and databases across a Notion workspace by title text.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "query": {
+            "default": "",
+            "description": "Text to search for in page and database titles. Empty returns everything shared with the integration.",
+            "title": "Query",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "description": "Limit results: 'page', 'database', or empty for both",
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit": {
+            "default": 25,
+            "description": "Maximum results to return",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "SearchParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "A page or database visible to the integration.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "object_type": {
+            "default": "",
+            "title": "Object Type",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "parent_kind": {
+            "default": "",
+            "title": "Parent Kind",
+            "type": "string"
+          },
+          "parent_id": {
+            "default": "",
+            "title": "Parent Id",
+            "type": "string"
+          },
+          "last_edited": {
+            "default": "",
+            "title": "Last Edited",
+            "type": "string"
+          },
+          "in_trash": {
+            "default": false,
+            "title": "In Trash",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "NotionObject",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "read_page",
+      "description": "Read a Notion page: its properties and its actual block content.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page title or Notion page id/URL id, e.g. 'Q3 Roadmap'",
+            "title": "Page",
+            "type": "string"
+          },
+          "include_content": {
+            "default": true,
+            "description": "Include the page's actual block content, not just properties",
+            "title": "Include Content",
+            "type": "boolean"
+          },
+          "max_blocks": {
+            "default": 200,
+            "description": "Maximum blocks to read from the page body",
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Max Blocks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "ReadPageParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "A page with its properties and actual block content.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "content": {
+            "default": "",
+            "title": "Content",
+            "type": "string"
+          },
+          "block_count": {
+            "default": 0,
+            "title": "Block Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": true,
+            "default": {},
+            "title": "Properties"
+          },
+          "last_edited": {
+            "default": "",
+            "title": "Last Edited",
+            "type": "string"
+          },
+          "in_trash": {
+            "default": false,
+            "title": "In Trash",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "PageContent",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "browse",
+      "description": "Browse the workspace structure: top-level objects, or the children of a page.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "parent": {
+            "default": "",
+            "description": "Page or database to list children of. Empty lists the top-level objects shared with the integration.",
+            "title": "Parent",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum children to return",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "BrowseParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "A page or database visible to the integration.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "object_type": {
+            "default": "",
+            "title": "Object Type",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "parent_kind": {
+            "default": "",
+            "title": "Parent Kind",
+            "type": "string"
+          },
+          "parent_id": {
+            "default": "",
+            "title": "Parent Id",
+            "type": "string"
+          },
+          "last_edited": {
+            "default": "",
+            "title": "Last Edited",
+            "type": "string"
+          },
+          "in_trash": {
+            "default": false,
+            "title": "In Trash",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "NotionObject",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "list_databases",
+      "description": "List the Notion databases the integration can reach.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "query": {
+            "default": "",
+            "description": "Filter databases by title text",
+            "title": "Query",
+            "type": "string"
+          },
+          "limit": {
+            "default": 25,
+            "description": "Maximum databases to return",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "ListDatabasesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "A page or database visible to the integration.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "object_type": {
+            "default": "",
+            "title": "Object Type",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "parent_kind": {
+            "default": "",
+            "title": "Parent Kind",
+            "type": "string"
+          },
+          "parent_id": {
+            "default": "",
+            "title": "Parent Id",
+            "type": "string"
+          },
+          "last_edited": {
+            "default": "",
+            "title": "Last Edited",
+            "type": "string"
+          },
+          "in_trash": {
+            "default": false,
+            "title": "In Trash",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "NotionObject",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "query_database",
+      "description": "Read the rows of a Notion database, with their property values.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "database": {
+            "description": "Database title or id, e.g. 'Tasks'",
+            "title": "Database",
+            "type": "string"
+          },
+          "limit": {
+            "default": 25,
+            "description": "Maximum rows to return",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "sort_by": {
+            "default": "",
+            "description": "Property name to sort by, e.g. 'Due date'",
+            "title": "Sort By",
+            "type": "string"
+          },
+          "descending": {
+            "default": false,
+            "description": "Sort newest/highest first",
+            "title": "Descending",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "database"
+        ],
+        "title": "QueryDatabaseParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One row of a Notion database.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Values",
+            "type": "object"
+          },
+          "last_edited": {
+            "default": "",
+            "title": "Last Edited",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "DatabaseRow",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "list_users",
+      "description": "List the people and bots in a connected Notion workspace.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum users to return",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "ListUsersParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "A person or bot in the workspace.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "user_type": {
+            "default": "",
+            "title": "User Type",
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "UserRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "list_comments",
+      "description": "Read the comments on a Notion page.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page title or id whose comments to read",
+            "title": "Page",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum comments to return",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "ListCommentsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "One comment on a page.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "author": {
+            "default": "",
+            "title": "Author",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "created": {
+            "default": "",
+            "title": "Created",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "CommentRecord",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "check_access",
+      "description": "Report what this integration can currently reach in Notion, and explain why anything missing is not visible.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "title": "CheckAccessParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "What the integration can and cannot reach, and why.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "workspace_name": {
+            "default": "",
+            "title": "Workspace Name",
+            "type": "string"
+          },
+          "pages_visible": {
+            "default": 0,
+            "title": "Pages Visible",
+            "type": "integer"
+          },
+          "databases_visible": {
+            "default": 0,
+            "title": "Databases Visible",
+            "type": "integer"
+          },
+          "total_visible": {
+            "default": 0,
+            "title": "Total Visible",
+            "type": "integer"
+          },
+          "explanation": {
+            "default": "",
+            "title": "Explanation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "AccessReport",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "create_page",
+      "description": "Create a Notion page, either inside another page or as a row in a database.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "notion.page.created"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "title": {
+            "description": "Title for the new page",
+            "title": "Title",
+            "type": "string"
+          },
+          "parent": {
+            "default": "",
+            "description": "Parent page or database title/id. Empty places the page at the top level the integration can reach.",
+            "title": "Parent",
+            "type": "string"
+          },
+          "content": {
+            "default": "",
+            "description": "Page body as plain text or simple markdown (# heading, - bullet, 1. numbered, > quote)",
+            "title": "Content",
+            "type": "string"
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Database properties when creating a row, e.g. {'Status': 'In progress', 'Priority': 'High'}",
+            "title": "Properties"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "CreatePageParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of a write action.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "WriteResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "notion-connector.create_page",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "update_page_content",
+      "description": "Add content to an existing Notion page.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "notion.page.updated"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page title or id to add content to",
+            "title": "Page",
+            "type": "string"
+          },
+          "content": {
+            "description": "Text to add, as plain text or simple markdown",
+            "title": "Content",
+            "type": "string"
+          },
+          "position": {
+            "default": "end",
+            "description": "Where to insert: 'end' (default) or 'start'",
+            "title": "Position",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page",
+          "content"
+        ],
+        "title": "UpdatePageContentParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of a write action.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "WriteResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "notion-connector.update_page_content",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "update_page",
+      "description": "Update a Notion page's title or its database property values.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "notion.page.updated"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page or database row title/id to update",
+            "title": "Page",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "description": "New title (omit to keep the current one)",
+            "title": "Title",
+            "type": "string"
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Database properties to set, e.g. {'Status': 'Done'}",
+            "title": "Properties"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "UpdatePageParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of a write action.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "WriteResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "notion-connector.update_page",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "move_page",
+      "description": "Move a Notion page under a different parent page or database.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "notion.page.moved"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page title or id to move",
+            "title": "Page",
+            "type": "string"
+          },
+          "new_parent": {
+            "description": "Destination page or database title/id",
+            "title": "New Parent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page",
+          "new_parent"
+        ],
+        "title": "MovePageParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of a write action.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "WriteResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "notion-connector.move_page",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "trash_page",
+      "description": "Move a Notion page to the trash, or restore it back out.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "notion.page.trashed"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page title or id to move to Notion's trash",
+            "title": "Page",
+            "type": "string"
+          },
+          "restore": {
+            "default": false,
+            "description": "Set true to restore a page out of the trash instead",
+            "title": "Restore",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "TrashPageParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of a write action.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "WriteResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "notion-connector.trash_page",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "add_comment",
+      "description": "Add a comment to a Notion page.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "notion.comment.created"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "page": {
+            "description": "Page title or id to comment on",
+            "title": "Page",
+            "type": "string"
+          },
+          "comment": {
+            "description": "Comment text",
+            "title": "Comment",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page",
+          "comment"
+        ],
+        "title": "AddCommentParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of a write action.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "WriteResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "notion-connector.add_comment",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    },
+    {
+      "name": "create_database",
+      "description": "Create a Notion database inside a page, with the columns you name.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "notion.database.created"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "workspace": {
+            "default": "",
+            "description": "Workspace name, e.g. 'Acme HQ'. Omit when only one Notion workspace is connected.",
+            "title": "Workspace",
+            "type": "string"
+          },
+          "title": {
+            "description": "Title for the new database",
+            "title": "Title",
+            "type": "string"
+          },
+          "parent": {
+            "description": "Parent page title or id the database will live in",
+            "title": "Parent",
+            "type": "string"
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Column name -> type, e.g. {'Status': 'select', 'Due': 'date', 'Done': 'checkbox'}. A Name title column is always created.",
+            "title": "Properties"
+          }
+        },
+        "required": [
+          "title",
+          "parent"
+        ],
+        "title": "CreateDatabaseParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Outcome of a write action.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "notion_id": {
+            "default": "",
+            "title": "Notion Id",
+            "type": "string"
+          },
+          "action": {
+            "default": "",
+            "title": "Action",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "WriteResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "notion-connector.create_database",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "notion"
+    }
+  ],
+  "signals": [],
+  "schedules": [],
+  "required_scopes": [],
+  "icon_size_bytes": 534,
+  "lifecycle": {
+    "health_check": {
+      "interval_sec": 60
+    }
+  },
+  "secrets": [
+    {
+      "name": "notion_tokens",
+      "description": "Notion integration token(s) -- one per line, one line per workspace. Create at notion.so/my-integrations, then share the pages or databases the integration should reach.",
+      "required": true,
+      "write_mode": "user",
+      "max_bytes": 4096,
+      "scope": "user",
+      "rotation_hint_days": 180
+    }
+  ],
+  "panels": [
+    {
+      "panel_id": "secrets",
+      "slot": "right",
+      "title": "Secrets",
+      "tree": {},
+      "icon": "KeyRound",
+      "refresh": "manual",
+      "center_overlay": false
+    },
+    {
+      "panel_id": "workspaces",
+      "slot": "center",
+      "title": "Notion",
+      "tree": {},
+      "icon": "BookOpen",
+      "refresh": "manual",
+      "center_overlay": true
+    }
+  ]
+}
