@@ -12,8 +12,9 @@ from conftest import (bot_payload_default, data_source_payload, list_payload,
                       page_payload)
 from models import (AddCommentParams, BrowseParams, CheckAccessParams,
                     CreateDatabaseParams, MovePageParams,
-                    CreatePageParams, ListWorkspacesParams, ReadPageParams,
-                    SearchParams, TrashPageParams, UpdatePageParams)
+                    CreatePageParams, ListWorkspacesParams, QueryDatabaseParams,
+                    ReadPageParams, SearchParams, TrashPageParams,
+                    UpdatePageParams)
 
 
 # --- reading ----------------------------------------------------------------
@@ -240,3 +241,48 @@ async def test_moving_a_page_sends_a_typed_parent(connected_ctx, http):
     assert res.status == "success"
     assert http.calls[-1]["json"]["parent"] == {
         "type": "page_id", "page_id": "b" * 32}
+
+
+# --- querying a database by a pasted id -------------------------------------
+#
+# A database is a CONTAINER of data sources since 2025-09-03, and only a data
+# source answers /query. create_database returns the CONTAINER id, so the id a
+# user copies out of a create result is precisely the id that has to work here.
+# Assuming "a pasted id is a data source" made that id 404 and, worse, reported
+# it as NOT_SHARED -- telling the user to fix sharing that was never broken.
+
+async def test_querying_by_container_id_unwraps_to_its_data_source(connected_ctx, http):
+    container_id = "e" * 32
+    ds_id = "f" * 32
+    http.push(bot_payload_default())
+    http.push({"object": "error", "status": 404,
+               "message": "Could not find data source"}, status=404)
+    http.push({"object": "database", "id": container_id,
+               "title": [{"plain_text": "Sermons", "text": {"content": "Sermons"}}],
+               "data_sources": [{"id": ds_id, "name": "Sermons"}]})
+    http.push(list_payload([]))
+    res = await hr.query_database(connected_ctx, QueryDatabaseParams(
+        database=container_id))
+    assert res.status == "success"
+    assert f"data_sources/{ds_id}/query" in http.calls[-1]["url"]
+
+
+async def test_querying_by_a_data_source_id_still_queries_it_directly(connected_ctx, http):
+    ds_id = "a" * 32
+    http.push(bot_payload_default())
+    http.push(data_source_payload(ds_id=ds_id, title="Tasks"))
+    http.push(list_payload([]))
+    res = await hr.query_database(connected_ctx, QueryDatabaseParams(database=ds_id))
+    assert res.status == "success"
+    assert f"data_sources/{ds_id}/query" in http.calls[-1]["url"]
+
+
+async def test_a_container_with_no_data_source_says_so(connected_ctx, http):
+    container_id = "b" * 32
+    http.push(bot_payload_default())
+    http.push({"object": "error", "status": 404, "message": "no"}, status=404)
+    http.push({"object": "database", "id": container_id, "data_sources": []})
+    res = await hr.query_database(connected_ctx, QueryDatabaseParams(
+        database=container_id))
+    assert res.status == "error"
+    assert res.error_code == nc.NOTION_NO_DATA_SOURCE

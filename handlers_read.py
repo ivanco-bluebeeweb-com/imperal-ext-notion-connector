@@ -300,7 +300,7 @@ async def query_database(ctx, params: QueryDatabaseParams) -> ActionResult:
     if err:
         return err
 
-    target = await ws.resolve_target(ctx, token, params.database, kind="data_source")
+    target = await shared.resolve_data_source(ctx, token, params.database)
     if not target.get("ok"):
         return _from_envelope(target)
 

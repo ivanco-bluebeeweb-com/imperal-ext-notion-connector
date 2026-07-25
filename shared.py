@@ -52,6 +52,51 @@ async def resolve(ctx, workspace: str) -> tuple[str, dict, ActionResult | None]:
     return picked["token"], picked.get("workspace", {}), None
 
 
+async def resolve_data_source(ctx, token: str, reference: str) -> dict:
+    """Resolve a database reference to a queryable DATA SOURCE id.
+
+    Since 2025-09-03 a database is a *container* holding one or more data
+    sources, and only a data source answers `/query`. A pasted id may be either
+    one -- and `create_database` hands back the CONTAINER id, so the id a user
+    copies straight out of a create result is exactly the case that must work.
+    Guessing "data source" makes that id 404 as if it were not shared, so the
+    container is probed first and unwrapped to its first data source.
+
+    Returns {"ok": True, "id", "title"} or a notion_client error envelope.
+    """
+    target = await ws.resolve_target(ctx, token, reference)
+    if not target.get("ok"):
+        return target
+
+    target_id = target["id"]
+    title = target.get("title", "")
+
+    if target.get("resolved_by") == "id" or not target.get("object"):
+        probe = await nc.request(ctx, "GET", f"data_sources/{target_id}", token)
+        if probe.get("ok"):
+            return {"ok": True, "id": target_id,
+                    "title": title or no.title_of(probe["data"])}
+        container = await nc.request(ctx, "GET", f"databases/{target_id}", token)
+        if not container.get("ok"):
+            return container
+        sources = container["data"].get("data_sources")
+        if not isinstance(sources, list) or not sources:
+            return nc.fail(nc.NOTION_NO_DATA_SOURCE)
+        return {"ok": True, "id": str(sources[0].get("id") or ""),
+                "title": title or no.title_of(container["data"])}
+
+    if str(target.get("object")) == "database":
+        container = await nc.request(ctx, "GET", f"databases/{target_id}", token)
+        if not container.get("ok"):
+            return container
+        sources = container["data"].get("data_sources")
+        if not isinstance(sources, list) or not sources:
+            return nc.fail(nc.NOTION_NO_DATA_SOURCE)
+        return {"ok": True, "id": str(sources[0].get("id") or ""), "title": title}
+
+    return {"ok": True, "id": target_id, "title": title}
+
+
 def object_entity(item: dict) -> NotionObject:
     """Map a raw search/children result onto the flat NotionObject entity."""
     kind, parent_id = no.parent_ref(item)
