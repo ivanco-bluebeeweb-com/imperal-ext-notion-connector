@@ -200,8 +200,8 @@ async def request(ctx, method: str, path: str, token: str, *,
     """
     if not token:
         return fail(NOTION_TOKEN_MISSING,
-                    "No Notion integration token is configured yet -- add one in "
-                    "the app's Secrets tab.")
+                    "No Notion integration token is configured yet -- open the "
+                    "app's Connect Notion screen and paste one.")
 
     url = f"{NOTION_API}/{path.lstrip('/')}"
     fn = getattr(ctx.http, method.lower())

@@ -60,9 +60,10 @@ async def list_workspaces(ctx, params: ListWorkspacesParams) -> ActionResult:
     entries = await ws.list_workspaces(ctx, refresh=params.refresh)
     if not entries:
         return _error(
-            "No Notion integration token is configured yet. Create an integration "
-            "at notion.so/my-integrations, share your pages with it, then paste "
-            "the token into this app's Secrets tab.",
+            "No Notion integration token is configured yet. Create an "
+            "integration at notion.so/my-integrations, then paste its token on "
+            "the Connect Notion screen -- it is checked before it is saved. "
+            "Afterwards share your pages with it in Notion.",
             nc.NOTION_TOKEN_MISSING)
 
     records = [
