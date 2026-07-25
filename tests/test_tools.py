@@ -326,3 +326,35 @@ async def test_a_pasted_page_id_is_still_treated_as_a_page(connected_ctx, http):
     assert res.status == "success"
     parent = http.calls[-1]["json"]["parent"]
     assert parent == {"type": "page_id", "page_id": page_id}
+
+
+async def test_trashing_a_database_retries_on_the_database_endpoint(connected_ctx, http):
+    """A database is not reachable under /pages, so /pages 404s on one.
+
+    Treating that 404 as "not shared" made a database this app created
+    impossible for it to remove -- the user was told to fix sharing that was
+    never broken.
+    """
+    db_id = "a" * 32
+    http.push(bot_payload_default())
+    http.push({"object": "error", "status": 404,
+               "message": "Could not find page"}, status=404)
+    http.push({"object": "database", "id": db_id, "in_trash": True,
+               "url": f"https://www.notion.so/{db_id}"})
+    res = await hw.trash_page(connected_ctx, TrashPageParams(page=db_id))
+    assert res.status == "success"
+    assert f"databases/{db_id}" in http.calls[-1]["url"]
+    assert http.calls[-1]["json"] == {"in_trash": True}
+
+
+async def test_a_genuinely_missing_target_still_fails(connected_ctx, http):
+    """The database retry must not mask a real not-shared/missing target."""
+    ghost = "b" * 32
+    http.push(bot_payload_default())
+    http.push({"object": "error", "status": 404,
+               "message": "Could not find page"}, status=404)
+    http.push({"object": "error", "status": 404,
+               "message": "Could not find database"}, status=404)
+    res = await hw.trash_page(connected_ctx, TrashPageParams(page=ghost))
+    assert res.status == "error"
+    assert res.error_code == nc.NOTION_NOT_SHARED

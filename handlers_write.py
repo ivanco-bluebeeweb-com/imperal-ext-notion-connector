@@ -372,13 +372,23 @@ async def trash_page(ctx, params: TrashPageParams) -> ActionResult:
     if err:
         return err
 
-    target = await ws.resolve_target(ctx, token, params.page, kind="page")
+    target = await ws.resolve_target(ctx, token, params.page)
     if not target.get("ok"):
         return _from_envelope(target)
 
     # 2026-03-11 renamed `archived` to `in_trash`.
+    body = {"in_trash": not params.restore}
     out = await nc.request(ctx, "PATCH", f"pages/{target['id']}", token,
-                           json={"in_trash": not params.restore})
+                           json=body)
+    # A DATABASE is not reachable under /pages, so a 404 here may simply mean
+    # "this is a database" rather than "not shared". Retrying on /databases is
+    # what makes a database created by this app removable by it too -- without
+    # it, cleaning up your own database was impossible from any surface.
+    if not out.get("ok") and out.get("code") == nc.NOTION_NOT_SHARED:
+        as_database = await nc.request(
+            ctx, "PATCH", f"databases/{target['id']}", token, json=body)
+        if as_database.get("ok"):
+            out = as_database
     if not out.get("ok"):
         return _from_envelope(out)
 
