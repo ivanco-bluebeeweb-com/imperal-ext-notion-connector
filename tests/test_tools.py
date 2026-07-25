@@ -286,3 +286,43 @@ async def test_a_container_with_no_data_source_says_so(connected_ctx, http):
         database=container_id))
     assert res.status == "error"
     assert res.error_code == nc.NOTION_NO_DATA_SOURCE
+
+
+async def test_adding_a_row_by_container_id_unwraps_to_its_data_source(connected_ctx, http):
+    """The id create_database returns is a CONTAINER id -- rows must still land.
+
+    Without the container probe Notion answers "that ID is a database, not a
+    page", which blames the caller for what is really a missing probe.
+    """
+    container_id = "c" * 32
+    ds_id = "d" * 32
+    http.push(bot_payload_default())
+    http.push({"object": "error", "status": 404,
+               "message": "Could not find data source"}, status=404)
+    http.push({"object": "database", "id": container_id,
+               "title": [{"plain_text": "Sermons", "text": {"content": "Sermons"}}],
+               "data_sources": [{"id": ds_id, "name": "Sermons"}]})
+    http.push(data_source_payload(ds_id=ds_id, title="Sermons"))
+    http.push(page_payload(title="Idols"))
+    res = await hw.create_page(connected_ctx, CreatePageParams(
+        parent=container_id, title="Idols"))
+    assert res.status == "success"
+    parent = http.calls[-1]["json"]["parent"]
+    assert parent == {"type": "data_source_id", "data_source_id": ds_id}
+
+
+async def test_a_pasted_page_id_is_still_treated_as_a_page(connected_ctx, http):
+    """The container probe must not swallow the ordinary page case."""
+    page_id = "e" * 32
+    http.push(bot_payload_default())
+    http.push({"object": "error", "status": 404,
+               "message": "Could not find data source"}, status=404)
+    http.push({"object": "error", "status": 404,
+               "message": "Could not find database"}, status=404)
+    http.push(page_payload(page_id=page_id, title="Sermons"))
+    http.push(page_payload(title="Idols"))
+    res = await hw.create_page(connected_ctx, CreatePageParams(
+        parent=page_id, title="Idols"))
+    assert res.status == "success"
+    parent = http.calls[-1]["json"]["parent"]
+    assert parent == {"type": "page_id", "page_id": page_id}

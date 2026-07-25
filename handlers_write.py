@@ -107,22 +107,38 @@ async def _parent_payload(ctx, token: str, reference: str) -> dict:
     kind = target.get("object") or ""
 
     # A pasted id carries no type; ask Notion what it is rather than guessing.
+    # Order matters: data source, then database CONTAINER, then page. The
+    # container probe is not optional -- `create_database` returns a container
+    # id, so "create a database, then add a row to it" hands exactly that id
+    # back here. Skipping it made Notion answer "that ID is a database, not a
+    # page", which reads like the caller's mistake rather than a missing probe.
+    container: dict | None = None
     if not kind or target.get("resolved_by") == "id":
         probe = await nc.request(ctx, "GET", f"data_sources/{target_id}", token)
         if probe.get("ok"):
             kind = "data_source"
         else:
-            page_probe = await nc.request(ctx, "GET", f"pages/{target_id}", token)
-            if not page_probe.get("ok"):
-                return page_probe
-            kind = "page"
+            container_probe = await nc.request(
+                ctx, "GET", f"databases/{target_id}", token)
+            if container_probe.get("ok"):
+                kind = "database"
+                # Kept so the unwrap below does not re-fetch what we just read.
+                container = container_probe
+            else:
+                page_probe = await nc.request(
+                    ctx, "GET", f"pages/{target_id}", token)
+                if not page_probe.get("ok"):
+                    return page_probe
+                kind = "page"
 
     if kind in ("data_source", "database"):
         # A database CONTAINER id cannot parent a row; its data source can.
         if kind == "database":
-            container = await nc.request(ctx, "GET", f"databases/{target_id}", token)
-            if not container.get("ok"):
-                return container
+            if container is None:
+                container = await nc.request(
+                    ctx, "GET", f"databases/{target_id}", token)
+                if not container.get("ok"):
+                    return container
             sources = container["data"].get("data_sources")
             if not isinstance(sources, list) or not sources:
                 return nc.fail(nc.NOTION_NO_DATA_SOURCE)
