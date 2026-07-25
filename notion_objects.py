@@ -100,6 +100,19 @@ def parent_ref(obj: dict) -> tuple[str, str]:
     return kind, ""
 
 
+def build_parent(key: str, parent_id: str) -> dict:
+    """Build a parent payload Notion will accept: {"type": key, key: id}.
+
+    The discriminator `type` is NOT optional. /v1/pages happens to infer it from
+    the single id key, but /v1/databases rejects the body outright
+    ("body.parent.type should be defined"), so hand-built `{"page_id": ...}`
+    dicts worked in one place and failed in another. Every parent payload is
+    built here so that asymmetry cannot come back: this is the write-side
+    counterpart to `parent_ref` above.
+    """
+    return {"type": key, key: str(parent_id or "")}
+
+
 def property_to_plain(prop: object) -> str:
     """Render one page property value as a short human string.
 

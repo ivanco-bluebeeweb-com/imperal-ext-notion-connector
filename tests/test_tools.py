@@ -11,6 +11,7 @@ import notion_client as nc
 from conftest import (bot_payload_default, data_source_payload, list_payload,
                       page_payload)
 from models import (AddCommentParams, BrowseParams, CheckAccessParams,
+                    CreateDatabaseParams, MovePageParams,
                     CreatePageParams, ListWorkspacesParams, ReadPageParams,
                     SearchParams, TrashPageParams, UpdatePageParams)
 
@@ -163,3 +164,79 @@ async def test_a_comment_targets_the_resolved_page(connected_ctx, http):
     assert res.status == "success"
     body = http.calls[-1]["json"]
     assert body["parent"]["page_id"] == "c" * 32
+
+
+# --- parent payloads --------------------------------------------------------
+#
+# Notion requires the `type` discriminator on every parent. /v1/pages tolerates
+# its absence (it infers the type from the single id key) but /v1/databases
+# rejects the body: "body.parent.type should be defined". That asymmetry let a
+# hand-built parent pass every existing test and still fail in production, so
+# the shape is asserted here for EVERY write path that sends one.
+
+async def test_creating_a_database_sends_a_typed_parent(connected_ctx, http):
+    """The bug: a parent without `type` makes /v1/databases reject the body."""
+    http.push(bot_payload_default())
+    http.push(list_payload([page_payload(page_id="d" * 32, title="Summary")]))
+    http.push({"object": "database", "id": "db-1",
+               "url": "https://www.notion.so/db-1"})
+    res = await hw.create_database(connected_ctx, CreateDatabaseParams(
+        title="Sermons", parent="Summary", properties={"Date": "date"}))
+    assert res.status == "success"
+    parent = http.calls[-1]["json"]["parent"]
+    assert parent == {"type": "page_id", "page_id": "d" * 32}
+
+
+async def test_creating_a_database_always_has_exactly_one_title_column(connected_ctx, http):
+    http.push(bot_payload_default())
+    http.push(list_payload([page_payload(title="Summary")]))
+    http.push({"object": "database", "id": "db-1", "url": ""})
+    res = await hw.create_database(connected_ctx, CreateDatabaseParams(
+        title="Sermons", parent="Summary",
+        properties={"Date": "date", "Topic": "select"}))
+    assert res.status == "success"
+    columns = http.calls[-1]["json"]["initial_data_source"]["properties"]
+    titles = [n for n, spec in columns.items() if "title" in spec]
+    assert len(titles) == 1
+
+
+async def test_an_unsupported_column_type_is_refused_with_a_code(connected_ctx, http):
+    http.push(bot_payload_default())
+    http.push(list_payload([page_payload(title="Summary")]))
+    res = await hw.create_database(connected_ctx, CreateDatabaseParams(
+        title="Sermons", parent="Summary", properties={"Score": "formula"}))
+    assert res.status == "error"
+    assert res.error_code == nc.NOTION_VALIDATION_FAILED
+
+
+async def test_a_row_parent_is_a_typed_data_source(connected_ctx, http):
+    http.push(bot_payload_default())
+    http.push(list_payload([data_source_payload(title="Tasks")]))
+    http.push(data_source_payload(title="Tasks"))
+    http.push(page_payload())
+    await hw.create_page(connected_ctx, CreatePageParams(
+        parent="Tasks", title="New task"))
+    parent = http.calls[-1]["json"]["parent"]
+    assert parent["type"] == "data_source_id"
+    assert parent["data_source_id"] == "2" * 32
+
+
+async def test_a_comment_parent_is_typed_too(connected_ctx, http):
+    http.push(bot_payload_default())
+    http.push(list_payload([page_payload(page_id="c" * 32, title="Q3 Roadmap")]))
+    http.push({"object": "comment", "id": "cm-1", "rich_text": []})
+    await hw.add_comment(connected_ctx,
+                         AddCommentParams(page="Q3 Roadmap", comment="Nice"))
+    assert http.calls[-1]["json"]["parent"]["type"] == "page_id"
+
+
+async def test_moving_a_page_sends_a_typed_parent(connected_ctx, http):
+    http.push(bot_payload_default())
+    http.push(list_payload([page_payload(page_id="a" * 32, title="Note")]))
+    http.push(list_payload([page_payload(page_id="b" * 32, title="Archive")]))
+    http.push(page_payload(page_id="a" * 32, title="Note"))
+    res = await hw.move_page(connected_ctx, MovePageParams(
+        page="Note", new_parent="Archive"))
+    assert res.status == "success"
+    assert http.calls[-1]["json"]["parent"] == {
+        "type": "page_id", "page_id": "b" * 32}

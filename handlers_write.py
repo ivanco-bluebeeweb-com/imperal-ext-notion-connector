@@ -131,11 +131,13 @@ async def _parent_payload(ctx, token: str, reference: str) -> dict:
         schema_out = await _data_source_schema(ctx, token, target_id)
         if not schema_out.get("ok"):
             return schema_out
-        return {"ok": True, "parent": {"data_source_id": target_id},
+        return {"ok": True,
+                "parent": no.build_parent("data_source_id", target_id),
                 "kind": "data_source", "schema": schema_out["schema"],
                 "title": target.get("title", "")}
 
-    return {"ok": True, "parent": {"page_id": target_id}, "kind": "page",
+    return {"ok": True, "parent": no.build_parent("page_id", target_id),
+            "kind": "page",
             "schema": {}, "title": target.get("title", "")}
 
 
@@ -172,7 +174,8 @@ async def create_page(ctx, params: CreatePageParams) -> ActionResult:
             return _error(
                 "There is no page this integration can create content in. "
                 f"{SHARING_NOTE}", nc.NOTION_NOT_SHARED)
-        parent = {"page_id": str(search["results"][0].get("id") or "")}
+        parent = no.build_parent(
+            "page_id", str(search["results"][0].get("id") or ""))
         schema = {}
 
     if schema:
@@ -394,7 +397,7 @@ async def add_comment(ctx, params: AddCommentParams) -> ActionResult:
         return _from_envelope(target)
 
     body = {
-        "parent": {"page_id": target["id"]},
+        "parent": no.build_parent("page_id", target["id"]),
         "rich_text": [{"type": "text", "text": {"content": params.comment}}],
     }
     out = await nc.request(ctx, "POST", "comments", token, json=body)
@@ -448,7 +451,7 @@ async def create_database(ctx, params: CreateDatabaseParams) -> ActionResult:
     columns["Name"] = {"title": {}}
 
     body = {
-        "parent": {"page_id": parent["id"]},
+        "parent": no.build_parent("page_id", parent["id"]),
         "title": [{"type": "text", "text": {"content": params.title}}],
         "initial_data_source": {"properties": columns},
     }
