@@ -104,10 +104,12 @@ def _state_alert(records: list[dict]):
     )
 
 
-@ext.panel("connect", slot="center", title="Connect Notion", icon="Plug",
-           center_overlay=True, refresh="manual")
 async def connect_panel(ctx, **kwargs):
     """Paste an integration token and connect a workspace.
+
+    NOT a panel of its own: it is one VIEW of the single center panel below.
+    Two panels declared on slot="center" fight over one slot -- see the
+    `notion_center` docstring for why that shipped as visible chaos.
 
     SKETCH -- connect screen (props checked against ui-components-reference)
       ui.Stack (v, gap=4)
@@ -251,7 +253,7 @@ async def connect_panel(ctx, **kwargs):
                     ui.Button(
                         label="Check what is reachable",
                         variant="primary",
-                        on_click=ui.Call("__panel__workspaces", refresh=True),
+                        on_click=ui.Call("__panel__notion", view="workspaces", refresh=True),
                     ),
                     ui.Button(
                         label="Ask in chat instead",
@@ -266,10 +268,10 @@ async def connect_panel(ctx, **kwargs):
     return ui.Stack(direction="v", gap=4, children=children)
 
 
-@ext.panel("workspaces", slot="center", title="Notion", icon="BookOpen",
-           center_overlay=True, refresh="manual")
 async def workspaces_panel(ctx, **kwargs):
     """Render connected workspaces and explain the sharing model.
+
+    One VIEW of the single center panel, not a panel itself.
 
     SKETCH -- workspaces panel
       ui.Stack (v, gap=4)
@@ -277,7 +279,7 @@ async def workspaces_panel(ctx, **kwargs):
         ui.Alert(...)                                   -- connection state
         ui.Section(title="Connected workspaces", children=[
           ui.DataTable(columns=[DataColumn dicts], rows=[plain dicts])
-          | ui.Empty(message=..., action=ui.Call("__panel__connect"))
+          | ui.Empty(message=..., action=ui.Call("__panel__notion", view="connect"))
         ])
         ui.Section(title="How access works", children=[
           ui.Text(content=..., variant="body") x2   -- content=, NOT text=
@@ -318,7 +320,7 @@ async def workspaces_panel(ctx, **kwargs):
     else:
         body = ui.Empty(
             message="No Notion workspace connected yet.",
-            action=ui.Call("__panel__connect"),
+            action=ui.Call("__panel__notion", view="connect"),
         )
 
     alert = (
@@ -367,12 +369,12 @@ async def workspaces_panel(ctx, **kwargs):
                             ui.Button(
                                 label="Re-check access",
                                 variant="secondary",
-                                on_click=ui.Call("__panel__workspaces", refresh=True),
+                                on_click=ui.Call("__panel__notion", view="workspaces", refresh=True),
                             ),
                             ui.Button(
                                 label="Connect another workspace",
                                 variant="ghost",
-                                on_click=ui.Call("__panel__connect"),
+                                on_click=ui.Call("__panel__notion", view="connect"),
                             ),
                             ui.Link(
                                 label="Open notion.so/my-integrations",
@@ -384,6 +386,51 @@ async def workspaces_panel(ctx, **kwargs):
             ),
         ],
     )
+
+
+@ext.panel("notion", slot="center", title="Notion", icon="BookOpen",
+           center_overlay=True, refresh="manual")
+async def notion_center(ctx, **kwargs):
+    """The ONE center panel. `view` picks which screen renders inside it.
+
+    Why this exists as a single panel:
+
+    `connect` and `workspaces` were two separate panels, both slot="center"
+    with center_overlay=True. The host fetches every configured slot in one
+    batch at session init and a center slot holds exactly ONE panel with
+    REPLACE semantics -- no stacking, no tabs. Two overlay panels claiming the
+    same slot therefore race: both are fetched, one silently replaces the
+    other, and pressing a button that dispatches the loser looks like nothing
+    happening while the shell re-renders around it. That is exactly the
+    reported symptom -- "the left sidebar reloads and nothing happens" -- and
+    it is a structural error, not a rendering bug: no amount of fixing the
+    button could cure it while two panels owned one slot.
+
+    Now there is one owner. Switching screens is a parameter, so a dispatch
+    always targets the panel that is actually mounted:
+
+        ui.Call("__panel__notion")                      -> workspaces (default)
+        ui.Call("__panel__notion", view="connect")      -> connect screen
+        ui.Call("__panel__notion", refresh=True)        -> workspaces, re-read
+
+    A first-time user with no token lands on the connect screen automatically:
+    the default view answers "what do I do now?" instead of showing an empty
+    table.
+    """
+    view = str(kwargs.get("view") or "").strip().lower()
+
+    if view not in ("connect", "workspaces"):
+        # No explicit view: send an unconfigured user straight to the one
+        # action that unblocks them, and everyone else to their workspaces.
+        try:
+            records = await ws.list_workspaces(ctx)
+        except Exception:
+            records = []
+        view = "workspaces" if records else "connect"
+
+    if view == "connect":
+        return await connect_panel(ctx, **kwargs)
+    return await workspaces_panel(ctx, **kwargs)
 
 
 @ext.panel("notion_nav", slot="left", title="Notion", icon="BookOpen",
@@ -414,7 +461,7 @@ async def notion_nav(ctx, **kwargs):
             label="Connect Notion",
             variant="primary",
             full_width=True,
-            on_click=ui.Call("__panel__connect"),
+            on_click=ui.Call("__panel__notion", view="connect"),
         )
     else:
         state = f"{usable} of {len(records)} workspace(s) ready"
@@ -422,7 +469,7 @@ async def notion_nav(ctx, **kwargs):
             label="Open Notion panel",
             variant="secondary",
             full_width=True,
-            on_click=ui.Call("__panel__workspaces"),
+            on_click=ui.Call("__panel__notion", view="workspaces"),
         )
 
     return ui.Stack(

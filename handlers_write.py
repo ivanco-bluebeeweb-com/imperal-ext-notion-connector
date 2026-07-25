@@ -516,10 +516,11 @@ async def connect_workspace(ctx, params: ConnectWorkspaceParams) -> ActionResult
         description=detail,
     )
     # data first, summary second (ActionResult.success signature).
-    # refresh_panels: the connect screen and the workspace list both show
-    # connection state, so they must not keep showing "not connected" after a
-    # successful save.
+    # refresh_panels takes BARE panel ids (the host prepends __panel__). Both
+    # surfaces show connection state, so neither may keep saying "not
+    # connected" after a successful save. There is one center panel now --
+    # naming a panel that no longer exists would silently refresh nothing.
     return ActionResult.success(
         record, detail,
-        refresh_panels=["connect", "workspaces", "notion_nav"],
+        refresh_panels=["notion", "notion_nav"],
     )

@@ -187,7 +187,8 @@ async def test_connect_workspace_tool_reports_which_workspace_it_connected(ctx, 
     assert result.status == "success"
     assert "Acme HQ" in result.summary
     # Panels showing connection state must not keep saying "not connected".
-    assert "connect" in (result.refresh_panels or [])
+    # One center panel now ("notion"), plus the sidebar.
+    assert "notion" in (result.refresh_panels or [])
 
 
 async def test_connect_workspace_tool_explains_sharing_after_connecting(ctx, http):

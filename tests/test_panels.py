@@ -160,7 +160,8 @@ async def test_empty_workspaces_panel_leads_to_the_connect_screen(ctx):
     tree = await panels.workspaces_panel(ctx)
     empty = next(n for n in _flatten(tree) if n.type == "Empty")
     action = empty.props["action"]
-    assert action.params["function"] == "__panel__connect"
+    assert action.params["function"] == "__panel__notion"
+    assert action.params["params"]["view"] == "connect"
 
 
 async def test_a_broken_token_is_a_warning_row_not_a_blank_screen(ctx, http):
@@ -204,3 +205,61 @@ async def test_sidebar_switches_to_open_panel_once_connected(connected_ctx, http
     labels = [n.props.get("label") for n in _flatten(tree) if n.type == "Button"]
     assert "Open Notion panel" in labels
     assert "Connect Notion" not in labels
+
+
+# --- slot ownership ---------------------------------------------------------
+
+def test_at_most_one_panel_per_slot():
+    """Two panels on one slot is a structural bug, not a rendering bug.
+
+    `connect` and `workspaces` were both slot="center", center_overlay=True.
+    The host fetches each configured slot once at session init and a slot holds
+    exactly ONE panel with replace semantics -- so the two raced, one replaced
+    the other, and dispatching the loser looked like "nothing happens while the
+    shell reloads". Nothing caught it: the validator accepts it and every panel
+    rendered fine in isolation. Only looking at the slot MAP reveals it.
+    """
+    import main  # noqa: F401  -- registers every panel
+    from app import ext
+
+    seen: dict[str, list[str]] = {}
+    for panel_id, spec in ext.panels.items():
+        slot = spec["slot"] if isinstance(spec, dict) else getattr(spec, "slot")
+        seen.setdefault(slot, []).append(panel_id)
+
+    clashes = {slot: ids for slot, ids in seen.items() if len(ids) > 1}
+    assert not clashes, f"more than one panel claims a slot: {clashes}"
+
+
+def test_every_dispatched_panel_id_exists():
+    """A ui.Call naming a dead panel fails only when the user clicks it.
+
+    Renaming the center panel is exactly when this breaks, so assert the whole
+    graph of dispatches against the registry instead of trusting a grep.
+    """
+    import re
+
+    import main  # noqa: F401
+    from app import ext
+
+    source = open("panels.py", encoding="utf-8").read()
+    dispatched = set(re.findall(r'ui\.Call\(\s*"__panel__(\w+)"', source))
+    unknown = dispatched - set(ext.panels)
+    assert not unknown, f"panels dispatched but never declared: {unknown}"
+
+
+def test_refresh_panels_name_real_panels():
+    """`refresh_panels` takes bare ids -- a stale name refreshes nothing."""
+    import re
+
+    import main  # noqa: F401
+    from app import ext
+
+    named: set[str] = set()
+    for path in ("handlers_write.py", "handlers_read.py"):
+        source = open(path, encoding="utf-8").read()
+        for block in re.findall(r"refresh_panels=\[([^\]]*)\]", source):
+            named.update(re.findall(r'"(\w+)"', block))
+
+    unknown = named - set(ext.panels)
+    assert not unknown, f"refresh_panels names non-existent panels: {unknown}"
