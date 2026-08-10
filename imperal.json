@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.12",
+  "sdk_version": "5.9.13",
   "app_id": "notion-connector",
   "version": "1.0.0",
   "name": "Notion Connector",
@@ -2342,7 +2342,7 @@
   "signals": [],
   "schedules": [],
   "required_scopes": [],
-  "icon_size_bytes": 534,
+  "icon_size_bytes": 1556,
   "lifecycle": {
     "on_install": true,
     "health_check": {
@@ -2376,16 +2376,7 @@
       "center_overlay": false
     },
     {
-      "panel_id": "connect",
-      "slot": "center",
-      "title": "Connect Notion",
-      "tree": {},
-      "icon": "Plug",
-      "refresh": "manual",
-      "center_overlay": true
-    },
-    {
-      "panel_id": "workspaces",
+      "panel_id": "notion",
       "slot": "center",
       "title": "Notion",
       "tree": {},
