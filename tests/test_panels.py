@@ -142,7 +142,7 @@ async def test_workspaces_panel_renders_connected_rows(connected_ctx, http):
     }]
 
     alert = next(n for n in _flatten(tree) if n.type == "Alert")
-    assert alert.props["type"] == "success"
+    assert alert.props["variant"] == "success"
 
 
 async def test_workspaces_panel_row_keys_match_the_declared_columns(connected_ctx, http):
@@ -171,7 +171,7 @@ async def test_a_broken_token_is_a_warning_row_not_a_blank_screen(ctx, http):
 
     tree = await panels.workspaces_panel(ctx, refresh=True)
     alert = next(n for n in _flatten(tree) if n.type == "Alert")
-    assert alert.props["type"] == "warn"
+    assert alert.props["variant"] == "warn"
     table = next(n for n in _flatten(tree) if n.type == "DataTable")
     assert len(table.props["rows"]) == 2
     assert "Needs attention" in [r["status"] for r in table.props["rows"]]
@@ -188,7 +188,7 @@ async def test_panel_renders_a_banner_when_loading_blows_up(ctx, monkeypatch):
     assert "store exploded" not in body
     assert "/internal/path" not in body
     alert = next(n for n in _flatten(tree) if n.type == "Alert")
-    assert alert.props["type"] == "error"
+    assert alert.props["variant"] == "error"
 
 
 # --- the sidebar ------------------------------------------------------------
