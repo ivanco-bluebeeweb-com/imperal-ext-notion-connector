@@ -127,3 +127,36 @@ async def test_error_update_page_content_with_empty_text(connected_ctx, http):
         connected_ctx, UpdatePageContentParams(page="Notes", content="   "))
     assert res.status == "error"
     assert res.error_code == nc.NOTION_VALIDATION_FAILED
+
+
+# ── Part D2 (SCENARIO_TESTING_STANDARD.md): idempotency / double-invocation ─
+
+async def test_d2_double_trash_page_is_idempotent(connected_ctx, http):
+    """trash_page PATCHes in_trash=true -- Notion's own API treats setting
+    an already-true field as a normal success (not an error), so calling
+    trash_page twice on the same page must stay a clean success both times,
+    never crash or report a confusing second-call error."""
+    from models import TrashPageParams
+    page_id = "f" * 32
+    http.push(bot_payload_default())
+    http.push(list_payload([page_payload(page_id=page_id, title="Draft")]))
+    http.push(page_payload(page_id=page_id, title="Draft", in_trash=True))
+    first = await hw.trash_page(connected_ctx, TrashPageParams(page="Draft"))
+    assert first.status == "success"
+
+    http.push(list_payload([page_payload(page_id=page_id, title="Draft", in_trash=True)]))
+    http.push(page_payload(page_id=page_id, title="Draft", in_trash=True))
+    second = await hw.trash_page(connected_ctx, TrashPageParams(page="Draft"))
+    assert second.status == "success"
+
+
+# ── Part D3 (SCENARIO_TESTING_STANDARD.md): security / SSRF surface -------
+
+async def test_d3_no_ssrf_all_calls_target_fixed_notion_api_host():
+    """No @chat.function accepts a raw URL that gets fetched -- the `url`
+    fields on NotionObject/PageContent/DatabaseRow are Notion's own
+    read-only page links, returned data, never a fetch target. Every
+    outbound call in notion_client.request() is built from the fixed
+    NOTION_API constant plus a path, never a user-supplied host.
+    Regression trip-wire on that constant."""
+    assert nc.NOTION_API == "https://api.notion.com/v1"
