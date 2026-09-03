@@ -2393,5 +2393,34 @@
       "refresh": "manual",
       "center_overlay": false
     }
-  ]
+  ],
+  "pricing": {
+    "model": "per_action",
+    "currency": "credits",
+    "monthly_price": 0,
+    "free_tools": [
+      "check_access",
+      "connect_workspace"
+    ],
+    "tool_prices": {
+      "list_workspaces": 8,
+      "search": 16,
+      "read_page": 8,
+      "browse": 16,
+      "list_databases": 8,
+      "query_database": 16,
+      "list_users": 8,
+      "list_comments": 8,
+      "check_access": 0,
+      "create_page": 16,
+      "update_page_content": 16,
+      "update_page": 16,
+      "move_page": 16,
+      "trash_page": 16,
+      "add_comment": 16,
+      "create_database": 16,
+      "connect_workspace": 0
+    },
+    "notes": "Standard platform scale {0, 8, 16, 20, 40}. 0 = access setup and harmless discovery. 8 = read/list/search. 16 = standard single mutation/CRUD. 20 = bulk or heavy audit operation."
+  }
 }
