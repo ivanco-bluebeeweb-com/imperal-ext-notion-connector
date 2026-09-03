@@ -16,6 +16,9 @@ write it -- ``ctx.secrets.set()`` raises SecretWriteForbidden. Only Panel UI
 may write it.
 
 These panels therefore never capture the token themselves. The docs recipe
+ui.Button("Connect Notion Workspace (OAuth 2.0)", variant="primary", size="sm", icon="login"),
+ui.Divider(),
+ui.Text("Or connect via Internal Integration Token", variant="caption"),
 (recipes/handle-user-api-keys) shows ``ui.Form(action="save_app_secret")``, but
 a panel ``action`` is resolved against the FUNCTIONS OF THIS EXTENSION, and
 ``save_app_secret`` belongs to the developer extension -- so it fails at click
@@ -441,8 +444,8 @@ async def notion_nav(ctx, **kwargs):
     SKETCH -- left nav panel
       ui.Stack (v, gap=2)
         ui.Text(content=<state>, variant="body")
-        ui.Button("Connect Notion" | "Open Notion panel", full_width=True)
-        ui.Button("Check access", variant="ghost", full_width=True)
+        ui.Button("Connect Notion" | "Open Notion panel")
+        ui.Button("Check access", variant="ghost")
 
     Deliberately tiny: the sidebar is for orientation, not for data. The first
     button changes with state -- an unconfigured app should offer the ONE
@@ -460,7 +463,6 @@ async def notion_nav(ctx, **kwargs):
         primary = ui.Button(
             label="Connect Notion",
             variant="primary",
-            full_width=True,
             on_click=ui.Call("__panel__notion", view="connect"),
         )
     else:
@@ -468,7 +470,6 @@ async def notion_nav(ctx, **kwargs):
         primary = ui.Button(
             label="Open Notion panel",
             variant="secondary",
-            full_width=True,
             on_click=ui.Call("__panel__notion", view="workspaces"),
         )
 
@@ -481,7 +482,6 @@ async def notion_nav(ctx, **kwargs):
             ui.Button(
                 label="Check access",
                 variant="ghost",
-                full_width=True,
                 on_click=ui.Send("Check my Notion access"),
             ),
         ],
